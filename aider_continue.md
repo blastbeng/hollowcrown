@@ -169,29 +169,61 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Realm handshake after ENet connect (Vision 4): password check + spawn flow
-   + peer names — join now loads the arena (RealmJoined -> Main.EnterRealm)
-   but there are no networked PLAYERS yet. Fold in: spawn both peers' wardens,
-   player HP/death/respawn through CombatAuthority (ICombatTarget), enemy
-   nameplates red (6.8), position sync, PvP hit flow (client requests vs
-   remote player). (Session 3 note resolved: arena now loads on connect.)
-2. Rigged class models: store humanoid with FACE + per-class silhouette
+1. Rigged class models: store humanoid with FACE + per-class silhouette
    (Warden broad + shield), retint, weapon sockets, run/attack/roll/death
-   anims (Vision 6.8 — capsule stand-in is temporary).
-3. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
-4. Arena polish remainder: gothic arches (store assets or Blender), banner
+   anims (Vision 6.8 — capsule stand-in is temporary). Search the store FIRST.
+2. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
+3. Arena polish remainder: gothic arches (store assets or Blender), banner
    sway, chains/cobwebs (6.7), ember mote tuning (currently reads as glow —
    want distinct rising sparks). (Rubble ~2x DONE, verified on screen.)
-5. Balance harness v1: bot mirror matches, winrate matrix printed.
-6. XP/leveling + progression sync to central + results screen.
-7. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-8. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
-9. Skirmish mode (3v3) + team spawns/score.
-10. Open world zone: village chunks, shrines, roaming elites, minimap.
-11. Matchmaking quick-play flow via central.
-12. Atmosphere pass 2: ambience audio, fog drift, fireflies.
-13. Windows + Linux export presets + dedicated server headless export.
-14. Robustness: disconnects, rejoin, XP/MMR validation caps.
+4. Balance harness v1: bot mirror matches, winrate matrix printed.
+5. XP/leveling + progression sync to central + results screen.
+6. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+7. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
+8. Skirmish mode (3v3) + team spawns/score.
+9. Open world zone: village chunks, shrines, roaming elites, minimap.
+10. Matchmaking quick-play flow via central.
+11. Atmosphere pass 2: ambience audio, fog drift, fireflies.
+12. Windows + Linux export presets + dedicated server headless export.
+13. Robustness: rejoin UX (kicked/lost peers currently just resume offline),
+    position-report trust checks (anti-cheat), nameplate HP bars.
+
+SESSION 7 NOTE (2026-09-04) — REALM HANDSHAKE + NETWORKED PLAYERS DONE and
+verified end-to-end (Vision 4 + 9). New: password handshake RPC right after
+ENet connect (wrong password = SceneMultiplayer.DisconnectPeer kick; client
+resumes offline mode on ServerDisconnected); deterministic duel spawn points
+(SpawnPoints, catch-up replay of the roster to late joiners); SpawnPlayer/
+DespawnPlayer broadcasts; players are ICombatTargets (CombatId == ENet peer
+id, boot-time id 1 re-registered on approval); 10 Hz client->server position
+reports relayed to peers; RemoteAvatar puppets (cold steel + red enemy
+nameplate, lerp, hit punch, fall/fade death, respawn teleport); PvP hits
+validated server-side vs the victim's REPORTED position (self-targeting
+rejected); player death/respawn/stun mirrors in PlayerController (fall with
+0.35 m lift so the lying capsule rests on the floor); kits target group
+"combat_targets" (dummies + players, self excluded); HUD target frame
+generalized (enemy name + mirrored HP). Main.JoinRealm(host, port, password)
++ --join host:port [--password x] launch flag (direct IP join + automated
+second client). EVIDENCE (server + 2 clients): kick logged on wrong password;
+roster catch-up gave client 1 client 2's avatar; server beat showed reported
+positions moving; full PvP kill — chain 20/20/35 + bash 15 = exact BALANCE
+numbers, killfeed "Warden#X slew Warden#Y" on screen, victim client logged
+DOWN/STUNNED/RESPAWNED, avatar fell + faded, respawn at spawn point; self-hit
+rejected. Commits 47d3bae..8575ad6 + 95cf335 (recovered 18 .uid files from
+the mirror's auto-checkpoints; pull.rebase set on the mirror).
+GOTCHAS (session 7): (17) pkill -f PATTERN self-matches the SSH bash -c
+command line whenever the pattern text appears anywhere in the same command
+string — put the kill in its OWN ssh call with a bracketed pattern
+(hea[d]less), never combine with relaunches. (18) The frozen OS cursor's
+ground point MOVES WITH THE CAMERA: when parking the player for a cursor-aim
+test, compute facing = player->cursor ground point first and park the enemy
+in THAT arc (the offset is a fixed world direction, ~+Z here). (19) On
+clients, CombatAuthority's _hp digest does NOT update from ApplyHitRpc — read
+the target's own mirror (RemoteAvatar.Hp / target frame) instead; server-side
+_hp is the truth. (20) Headless server/client processes keep running an OLD
+assembly until relaunched after a pull — relaunch them after every pull
+(stale-server cost us a debug round). (21) Server respawn (wall clock)
+routinely beats a screenshot/read round trip — a 100 HP read right after a
+kill usually means the respawn already happened.
 
 SESSION 6 NOTE (2026-09-04) — COMBAT SERVER AUTHORITY DONE and verified
 end-to-end (Vision 2.3). New: CombatAuthority (/root/Main/CombatAuthority on

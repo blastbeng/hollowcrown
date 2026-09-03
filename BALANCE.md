@@ -46,5 +46,12 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 | name         | value | notes                            |
 |--------------|-------|----------------------------------|
 | dummy_hp     | 100   | respawn 3.0 s after death        |
-| dummy_fall   | 0.45 s| fall + fade to 0.4 alpha, reset  |
+
+## Players (server-authoritative — CombatAuthority.cs / PlayerController.cs)
+| name         | value | notes                                       |
+|--------------|-------|---------------------------------------------|
+| player_hp    | 100   | authority-owned; clients mirror only        |
+| player_respawn | 3.0 s| at the peer's spawn point (server broadcast)|
+| buff_cap     | 1.25  | sane-cap anti-cheat on RequestBuff          |
+| position_sync | 10 Hz| client->server unreliable, relayed to peers |
 
