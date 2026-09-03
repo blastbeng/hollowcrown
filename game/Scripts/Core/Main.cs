@@ -60,18 +60,7 @@ public partial class Main : Node3D
 
         if (joinHost.Length > 0)
         {
-            CombatAuthority.PendingPassword = joinPassword;
-            var peer = new ENetMultiplayerPeer();
-            if (peer.CreateClient(joinHost, joinPort) == Error.Ok)
-            {
-                Multiplayer.MultiplayerPeer = peer;
-                GD.Print($"HOLLOWCROWN BOOT OK — joining realm at {joinHost}:{joinPort}");
-            }
-            else
-            {
-                GD.PrintErr($"JOIN FAILED: could not open socket to {joinHost}:{joinPort}");
-            }
-            EnterRealm();   // arena exists immediately; spawn lands on approval
+            JoinRealm(joinHost, joinPort, joinPassword);
             return;
         }
 
@@ -112,6 +101,24 @@ public partial class Main : Node3D
         };
 
         GD.Print("HOLLOWCROWN BOOT OK — C# assembly loaded, main scene ready");
+    }
+
+    /// <summary>Direct-IP realm join (Vision 1: direct join is always
+    /// available): dial the realm, present the password at handshake, and
+    /// load the arena immediately — the spawn lands on server approval.
+    /// Also the entry point for automated multiplayer smoke tests.</summary>
+    public void JoinRealm(string host, int port, string password)
+    {
+        CombatAuthority.PendingPassword = password;
+        var peer = new ENetMultiplayerPeer();
+        if (peer.CreateClient(host, port) != Error.Ok)
+        {
+            GD.PrintErr($"JOIN FAILED: could not open socket to {host}:{port}");
+            return;
+        }
+        Multiplayer.MultiplayerPeer = peer;
+        GD.Print($"HOLLOWCROWN BOOT OK — joining realm at {host}:{port}");
+        EnterRealm();
     }
 
     /// <summary>Enter the realm: hide the menu UI and build the arena under
