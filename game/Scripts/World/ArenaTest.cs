@@ -38,7 +38,7 @@ public partial class ArenaTest : Node3D
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
             AmbientLightColor = Color.FromHtml("1a1a22"),
-            AmbientLightEnergy = 0.8f,
+            AmbientLightEnergy = 1.1f,
             TonemapMode = Godot.Environment.ToneMapper.Aces,
             TonemapExposure = 1.0f,
             FogEnabled = true,
