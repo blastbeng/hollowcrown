@@ -18,8 +18,13 @@ public partial class IsoCameraRig : Node3D
     public override void _Ready()
     {
         _target = GetNode<Node3D>(TargetPath);
-        _cam = GetNode<Camera3D>("Camera3D");
-        RotationDegrees = new Vector3(0f, 45f, 0f);        // yaw locked
+        _cam = GetNodeOrNull<Camera3D>("Camera3D");
+        if (_cam is null)                              // rig is self-sufficient
+        {
+            _cam = new Camera3D { Name = "Camera3D" };
+            AddChild(_cam);
+        }
+        RotationDegrees = new Vector3(0f, 45f, 0f);    // yaw locked
         _cam.Projection = Camera3D.ProjectionType.Orthogonal;
         _cam.Size = 12f;
         _cam.Far = 60f;

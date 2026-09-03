@@ -13,8 +13,6 @@ public partial class Reticle : Node3D
 
     public override void _Ready()
     {
-        _cam = GetViewport().GetCamera3D();
-
         var mat = new StandardMaterial3D
         {
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
@@ -33,6 +31,9 @@ public partial class Reticle : Node3D
 
     public override void _Process(double delta)
     {
+        _cam ??= GetViewport().GetCamera3D();
+        if (_cam is null)
+            return;
         var p = Aim.CursorGroundPoint(_cam);
         GlobalPosition = new Vector3(p.X, 0.02f, p.Z);   // flat on the ground
     }
