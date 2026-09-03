@@ -1,50 +1,39 @@
 using Godot;
+using Hollowcrown.UI;
 
 namespace Hollowcrown.Core;
 
 /// <summary>
-/// Boot scene root. Proves the C# assembly loads, the engine boots, and the
-/// Section 6.10 palette drives the first UI. All later screens extend this theme.
+/// Boot + screen flow controller: login/register -> character select.
+/// Later: server browser -> lobby -> match (Section 6.10 flow).
 /// </summary>
 public partial class Main : Node3D
 {
+    private CentralClient _central = null!;
+    private LoginScreen _login = null!;
+    private CharacterSelect _characters = null!;
+
     public override void _Ready()
     {
-        var ui = new CanvasLayer { Name = "BootUI" };
-
-        var background = new ColorRect
-        {
-            Color = new Color("#121014"), // UI bg
-        };
-        background.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        ui.AddChild(background);
-
-        var center = new CenterContainer();
-        center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        background.AddChild(center);
-
-        var box = new VBoxContainer();
-        center.AddChild(box);
-
-        var title = new Label
-        {
-            Text = "HOLLOWCROWN",
-            HorizontalAlignment = HorizontalAlignment.Center,
-        };
-        title.AddThemeFontSizeOverride("font_size", 72);
-        title.AddThemeColorOverride("font_color", new Color("#b08d57")); // UI accent
-        box.AddChild(title);
-
-        var subtitle = new Label
-        {
-            Text = "dark fantasy isometric PvP MMO — boot OK",
-            HorizontalAlignment = HorizontalAlignment.Center,
-        };
-        subtitle.AddThemeFontSizeOverride("font_size", 22);
-        subtitle.AddThemeColorOverride("font_color", new Color("#d8cfc0")); // bone
-        box.AddChild(subtitle);
-
+        var ui = new CanvasLayer { Name = "RootUI" };
         AddChild(ui);
+
+        _central = new CentralClient { Name = "Central" };
+        AddChild(_central);
+
+        _characters = new CharacterSelect { Name = "CharacterSelect", Visible = false };
+        _characters.Bind(_central);
+        ui.AddChild(_characters);
+
+        _login = new LoginScreen { Name = "Login" };
+        _login.Bind(_central);
+        ui.AddChild(_login);
+
+        _central.LoggedIn += _ =>
+        {
+            _login.Visible = false;
+            _characters.Visible = true;
+        };
 
         GD.Print("HOLLOWCROWN BOOT OK — C# assembly loaded, main scene ready");
     }
