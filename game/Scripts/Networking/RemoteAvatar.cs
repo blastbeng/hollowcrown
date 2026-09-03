@@ -33,6 +33,7 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
 
     public override void _Ready()
     {
+        AddToGroup("combat_targets");   // kit candidate set (dummies + players)
         _targetPos = Position;
         Hp = MaxHp;
 

@@ -35,6 +35,7 @@ public partial class TrainingDummy : StaticBody3D, ICombatTarget
     public override void _Ready()
     {
         AddToGroup("dummies");
+        AddToGroup("combat_targets");   // kit candidate set (dummies + players)
         Hp = MaxHp;
 
         _visual = new Node3D { Name = "Visual" };

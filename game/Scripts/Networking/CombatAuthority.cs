@@ -69,6 +69,8 @@ public partial class CombatAuthority : Node
         public int CombatId { get; }
         public string DisplayName { get; }
         public int MaxHp => PlayerMaxHp;
+        public int Hp => _auth._hp.TryGetValue(CombatId, out int hp) ? hp : MaxHp;
+        public bool IsDead => Hp <= 0;
         public Vector3 CombatPosition => _auth._peers.TryGetValue(CombatId, out var info)
             ? info.Position
             : Vector3.Zero;

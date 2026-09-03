@@ -25,6 +25,7 @@ public partial class ArenaHud : CanvasLayer
     private PanelContainer _targetFrame = null!;
     private ProgressBar _targetHp = null!;
     private Label _targetText = null!;
+    private Label _targetName = null!;
     private PanelContainer _feedPanel = null!;
     private VBoxContainer _feed = null!;
     private readonly List<Slot> _slots = new();
@@ -193,6 +194,7 @@ public partial class ArenaHud : CanvasLayer
         };
         nameLabel.AddThemeFontSizeOverride("font_size", 12);
         vbox.AddChild(nameLabel);
+        _targetName = nameLabel;
 
         _targetHp = new ProgressBar
         {
@@ -279,23 +281,27 @@ public partial class ArenaHud : CanvasLayer
                 active ? Colors.White : UiTheme.Accent);
         }
 
-        // Target frame: nearest alive dummy within range (real HP).
-        TrainingDummy? target = null;
+        // Target frame: nearest alive combat target in range — dummy OR enemy
+        // warden — showing the server-mirrored HP (Vision 6.10).
+        ICombatTarget? target = null;
         float best = TargetRange;
-        foreach (var node in GetTree().GetNodesInGroup("dummies"))
+        foreach (var node in GetTree().GetNodesInGroup("combat_targets"))
         {
-            if (node is not TrainingDummy dummy || dummy.IsDead)
+            if (node is not Node3D n3 || node is not ICombatTarget candidate)
                 continue;
-            float d = _pc.GlobalPosition.DistanceTo(dummy.GlobalPosition);
+            if (candidate.IsDead || n3 == _pc)
+                continue;
+            float d = _pc.GlobalPosition.DistanceTo(n3.GlobalPosition);
             if (d < best)
             {
                 best = d;
-                target = dummy;
+                target = candidate;
             }
         }
         _targetFrame.Visible = target is not null;
         if (target is not null)
         {
+            _targetName.Text = target.DisplayName.ToUpperInvariant();
             _targetHp.MaxValue = target.MaxHp;
             _targetHp.Value = target.Hp;
             _targetText.Text = $"{target.Hp}/{target.MaxHp}";

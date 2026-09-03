@@ -103,21 +103,23 @@ public partial class WardenKit : Node3D
 
         ShowBashCone(facing);
         // Prediction filter only — the server re-validates every request and
-        // computes the damage/stun (CombatTables: ShieldBash).
+        // computes the damage/stun (CombatTables: ShieldBash). Candidates are
+        // ALL combat targets: dummies and OTHER wardens (PvP, Vision 9).
         var authority = CombatAuthority.For(this);
         int requests = 0;
-        foreach (var node in GetTree().GetNodesInGroup("dummies"))
+        foreach (var node in GetTree().GetNodesInGroup("combat_targets"))
         {
-            if (node is not TrainingDummy dummy)
+            if (node is not Node3D target || target == _body)
                 continue;
-            var to = dummy.GlobalPosition - _body.GlobalPosition;
+            var to = target.GlobalPosition - _body.GlobalPosition;
             to.Y = 0f;
-            if (to.Length() > BashRadius + 0.35f)     // + dummy half-width
+            if (to.Length() > BashRadius + 0.35f)     // + victim half-width
                 continue;
             if (Mathf.RadToDeg(facing.AngleTo(to.Normalized())) > BashArcDegrees * 0.5f)
                 continue;
-            authority?.RequestHit(dummy.CombatId, (int)AttackId.ShieldBash,
-                _body.GlobalPosition, facing);
+            if (node is ICombatTarget combatTarget)
+                authority?.RequestHit(combatTarget.CombatId, (int)AttackId.ShieldBash,
+                    _body.GlobalPosition, facing);
             requests++;
         }
         GD.Print($"WARDEN BASH stun={BashStunSeconds:0.0}s requests={requests} cd={BashCooldown:0.0}s (server computes damage)");

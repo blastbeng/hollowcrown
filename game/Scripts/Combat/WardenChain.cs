@@ -92,19 +92,21 @@ public partial class WardenChain : Node3D
             _ => (int)AttackId.ChainFinisher,
         };
         // Local arc filter is PREDICTION only — the server re-validates every
-        // request against its own world before applying any damage.
+        // request against its own world before applying any damage. Candidates
+        // are ALL combat targets: dummies and OTHER wardens (PvP, Vision 9).
         int requests = 0;
-        foreach (var node in GetTree().GetNodesInGroup("dummies"))
+        foreach (var node in GetTree().GetNodesInGroup("combat_targets"))
         {
-            if (node is not TrainingDummy dummy)
+            if (node is not Node3D target || target == _body)
                 continue;
-            var to = dummy.GlobalPosition - _body.GlobalPosition;
+            var to = target.GlobalPosition - _body.GlobalPosition;
             to.Y = 0f;
-            if (to.Length() > Reach + 0.35f)       // + dummy half-width
+            if (to.Length() > Reach + 0.35f)       // + victim half-width
                 continue;
             if (Mathf.RadToDeg(facing.AngleTo(to.Normalized())) > ArcDegrees * 0.5f)
                 continue;
-            authority?.RequestHit(dummy.CombatId, attackId, _body.GlobalPosition, facing);
+            if (node is ICombatTarget combatTarget)
+                authority?.RequestHit(combatTarget.CombatId, attackId, _body.GlobalPosition, facing);
             requests++;
         }
         EmitSignal(SignalName.ChainSwing, index, aim);

@@ -15,6 +15,13 @@ public interface ICombatTarget
     int CombatId { get; }
 
     int MaxHp { get; }
+
+    /// <summary>Mirrored authoritative HP (for UI/visuals only — never a
+    /// gameplay decision input on clients).</summary>
+    int Hp { get; }
+
+    /// <summary>Mirrored death state.</summary>
+    bool IsDead { get; }
     Vector3 CombatPosition { get; }
     string DisplayName { get; }
 

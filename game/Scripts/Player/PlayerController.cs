@@ -139,6 +139,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         FloorSnapLength = 0.4f;
         Stamina = StaminaMax;
         Hp = MaxHp;
+        AddToGroup("combat_targets");   // kit candidate set (dummies + players)
         CombatAuthority.For(this)?.RegisterSelf(this);   // join the authority's world
         GD.Print("PLAYER CONTROLLER READY — WASD camera-relative, sprint, dodge roll (0.3 s i-frames)");
     }
