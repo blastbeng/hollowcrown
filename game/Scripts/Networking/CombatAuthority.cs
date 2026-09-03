@@ -202,6 +202,16 @@ public partial class CombatAuthority : Node
         info.Position = spawn;
         SendSpawnPlayer(peer, spawn, name);
         GD.Print($"REALM: peer {peer} approved — spawns at {spawn}");
+
+        // Catch the new peer up with everyone already approved in the realm
+        // (late joiners miss earlier broadcast spawns).
+        foreach (var (otherId, other) in _peers)
+        {
+            if (otherId == peer || !other.Approved)
+                continue;
+            RpcId(peer, nameof(SpawnPlayerRpc), otherId,
+                SpawnPoints[other.SpawnIndex], $"Warden#{otherId}");
+        }
     }
 
     private void SendSpawnPlayer(int peerId, Vector3 spawnPos, string displayName)
