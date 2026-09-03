@@ -43,6 +43,10 @@ public partial class CharacterSelect : Control
 
         _status = new Label { Text = "" };
         margin.AddChild(_status);
+
+        VisibilityChanged += OnVisibilityChanged;
+        // keyboard flow: Enter in the name field creates the character
+        _newName.TextSubmitted += _text => _ = CreateCharacter();
     }
 
     private VBoxContainer BuildCharacterColumn()
