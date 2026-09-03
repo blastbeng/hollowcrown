@@ -38,9 +38,10 @@ public static class MaterialFactory
         return mat;
     }
 
-    // Palette helpers (Vision 6.10). Floor darker than walls so paths and
-    // silhouettes read against the ground (Vision 6.6).
-    public static StandardMaterial3D FloorStone() => Get("floor_stone", Color.FromHtml("55555a"), 0.92f, uvScale: 10f);
-    public static StandardMaterial3D WallStone() => Get("wall_stone", Color.FromHtml("5a5a5e"), 0.85f, occluder: true, uvScale: 3f);
-    public static StandardMaterial3D PlayerSteel() => Get("player_steel", Color.FromHtml("8a919c"), 0.45f, metallic: 0.5f, uvScale: 2f);
+    // Palette helpers (Vision 6.10). Tints are ~2x the palette hex because the
+    // grayscale NoiseTexture2D (mean ~0.5) multiplies them down. Floor darker
+    // than walls so paths and silhouettes read against the ground (Vision 6.6).
+    public static StandardMaterial3D FloorStone() => Get("floor_stone", Color.FromHtml("a8a8b0"), 0.92f, uvScale: 10f);
+    public static StandardMaterial3D WallStone() => Get("wall_stone", Color.FromHtml("b4b4bc"), 0.85f, occluder: true, uvScale: 3f);
+    public static StandardMaterial3D PlayerSteel() => Get("player_steel", Color.FromHtml("d4d8e0"), 0.45f, metallic: 0.5f, uvScale: 2f);
 }
