@@ -1,4 +1,5 @@
 using Godot;
+using Hollowcrown.Combat;
 using Hollowcrown.Player;
 
 namespace Hollowcrown.World;
@@ -23,9 +24,10 @@ public partial class ArenaTest : Node3D
         BuildBrazier(-3.5f, 2.2f, -3.5f);   // spawn side
         BuildBrazier(3.5f, 2.2f, 3.5f);     // obelisk side
         BuildRubble();
+        BuildDummy();
         BuildPlayer();
         BuildCameraAndHelpers();
-        GD.Print("ARENA TEST READY — iso camera rig, cursor aim reticle, occlusion fade live");
+        GD.Print("ARENA TEST READY — iso camera rig, cursor aim reticle, occlusion fade, combat live");
     }
 
     private void BuildEnvironment()
@@ -220,6 +222,15 @@ public partial class ArenaTest : Node3D
         AddChild(wall);
     }
 
+    private void BuildDummy()
+    {
+        // Combat target 4 m up-screen of the spawn: inside the chain reach
+        // after two steps of W, visible in the default iso framing.
+        var dummy = new TrainingDummy { Name = "TrainingDummy" };
+        dummy.Position = new Vector3(2.5f, 0f, -6f);
+        AddChild(dummy);
+    }
+
     private void BuildPlayer()
     {
         // Player controller owns the 1.8 m capsule visual now (Vision 6.4):
@@ -227,6 +238,7 @@ public partial class ArenaTest : Node3D
         // TargetPaths keep pointing at this same node.
         _player = new PlayerController { Name = "Player" };
         _player.Position = new Vector3(0, 0.2f, -2);
+        _player.AddChild(new WardenChain { Name = "WardenChain" });   // Vision 7 slice: Q/LMB sword chain
         AddChild(_player);
     }
 

@@ -20,3 +20,20 @@ harness run (Vision 7); harness arrives with the balance-harness task.
 ## Combat (to be filled by the combat core task)
 Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 0.25 s -> riposte (Vision 7). Class kits + numbers land with each class task.
+
+## Warden chain (Vision 7 kit slice 1; WardenChain.cs)
+| name          | value    | notes                                   |
+|---------------|----------|-----------------------------------------|
+| chain_damage  | 20/20/35 | 3-hit arc; finisher heavier             |
+| chain_reach   | 2.4 m    | ground-projected arc sector             |
+| chain_arc     | 120 deg  | sector centered on player, aims cursor  |
+| combo_window  | 0.9 s    | press again inside window to advance    |
+| full_chain    | 75 dmg   | kills a 100 HP dummy in 2 chains        |
+| attack_inputs | Q / LMB  | action "attack"                         |
+
+## Training dummy (TrainingDummy.cs — combat verification target)
+| name         | value | notes                            |
+|--------------|-------|----------------------------------|
+| dummy_hp     | 100   | respawn 3.0 s after death        |
+| dummy_fall   | 0.45 s| fall + fade to 0.4 alpha, reset  |
+
