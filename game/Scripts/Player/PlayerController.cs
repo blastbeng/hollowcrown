@@ -116,12 +116,13 @@ public partial class PlayerController : CharacterBody3D
     {
         if (_cam is null || input.LengthSquared() < 0.001f)
             return Vector3.Zero;
-        var fwd = _cam.GlobalBasis.Z;         // camera "behind" axis
-        fwd = new Vector3(fwd.X, 0f, fwd.Z).Normalized();
+        var back = _cam.GlobalBasis.Z;        // camera's backward axis
+        back = new Vector3(back.X, 0f, back.Z).Normalized();
         var right = _cam.GlobalBasis.X;
         right = new Vector3(right.X, 0f, right.Z).Normalized();
-        return (right * input.X - fwd * input.Y).Normalized();
-        // GetVector: move_forward contributes y = -1, so -fwd * y = +forward.
+        return (right * input.X + back * input.Y).Normalized();
+        // move_forward contributes y = -1 => -back = camera-forward. Correct:
+        // W walks AWAY from the camera (into the screen), like Diablo/V Rising.
     }
 
     private void HandleDodgeInput()
