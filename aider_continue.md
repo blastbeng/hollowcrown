@@ -178,19 +178,19 @@ compile check (remote or local):
    listed it, password-dialog join connected, registry showed players:1 server-side.
    Still open (fold into later iterations, not separate tasks): realm handshake after
    ENet connect (password check + spawn flow), match scene with actual combat.
-4. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment (Vision 6.2).
-5. Player controller: WASD camera-relative movement, sprint, dodge roll,
+2. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment (Vision 6.2).
+3. Player controller: WASD camera-relative movement, sprint, dodge roll,
    footstep/roll animation hooks.
-6. Combat core: ground-projected hitboxes, telegraph decals, damage numbers,
+4. Combat core: ground-projected hitboxes, telegraph decals, damage numbers,
    death/respawn, killfeed; Warden kit complete (chain, bash, warcry, wall).
-7. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
-8. Balance harness v1: bot mirror matches, winrate matrix printed.
-9. XP/leveling + progression sync to central + results screen.
-10. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-11. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
-12. Skirmish mode (3v3) + team spawns/score.
-13. Open world zone: village chunks, shrines, roaming elites, minimap.
-14. Matchmaking quick-play flow via central.
-15. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
-16. Windows + Linux export presets + dedicated server headless export.
-17. Robustness: disconnects, rejoin, XP/MMR validation caps.
+5. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
+6. Balance harness v1: bot mirror matches, winrate matrix printed.
+7. XP/leveling + progression sync to central + results screen.
+8. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+9. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
+10. Skirmish mode (3v3) + team spawns/score.
+11. Open world zone: village chunks, shrines, roaming elites, minimap.
+12. Matchmaking quick-play flow via central.
+13. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
+14. Windows + Linux export presets + dedicated server headless export.
+15. Robustness: disconnects, rejoin, XP/MMR validation caps.
