@@ -26,6 +26,26 @@ done
 [ -n "$HEALTH" ] || { echo "-- central log --"; cat /tmp/hc_test_central.log; fail "central /health" 2; }
 echo "central /health -> $HEALTH"
 
+echo "== central endpoint checks =="
+TS=$(date +%s)
+U="tester_$TS"
+CREDS="{\"user\":\"$U\",\"pass\":\"secret123\"}"
+TOKEN=$(curl -sf -X POST http://127.0.0.1:6561/auth/register -H 'Content-Type: application/json' -d "$CREDS" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+[ -n "$TOKEN" ] || fail "auth/register" 2
+AUTH="Authorization: Bearer $TOKEN"
+curl -sf -X POST http://127.0.0.1:6561/auth/login -H 'Content-Type: application/json' -d "$CREDS" >/dev/null || fail "auth/login" 2
+CHAR=$(curl -sf -X POST http://127.0.0.1:6561/characters -H "$AUTH" -H 'Content-Type: application/json' -d '{"name":"Ashen","classId":"warden"}')
+echo "$CHAR" | grep -q '"classId":"warden"' || fail "characters create: $CHAR" 2
+CID=$(echo "$CHAR" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+curl -sf -X PUT http://127.0.0.1:6561/characters/$CID/progress -H "$AUTH" -H 'Content-Type: application/json' -d '{"level":3,"xp":420,"gearJson":"[]"}' | grep -q '"level":3' || fail "progress save" 2
+curl -sf http://127.0.0.1:6561/characters/$CID -H "$AUTH" | grep -q '"xp":420' || fail "progress reload" 2
+curl -sf -X POST http://127.0.0.1:6561/servers/heartbeat -H 'Content-Type: application/json' \
+  -d "{\"serverId\":\"test-$TS\",\"name\":\"Test Realm\",\"mode\":\"duel\",\"host\":\"127.0.0.1\",\"port\":7777,\"players\":1,\"maxPlayers\":2,\"hasPassword\":false}" >/dev/null || fail "heartbeat" 2
+curl -sf "http://127.0.0.1:6561/servers?mode=duel" | grep -q "Test Realm" || fail "server list" 2
+CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6561/characters -H "Authorization: Bearer bad")
+[ "$CODE" = "401" ] || fail "bad token must be rejected with 401 (got $CODE)" 2
+echo "auth/characters/heartbeat endpoint checks OK"
+
 echo "== godot headless boot =="
 GODOT_BIN="$(command -v godot || true)"
 [ -z "$GODOT_BIN" ] && [ -x /opt/godot/bin/godot ] && GODOT_BIN=/opt/godot/bin/godot
