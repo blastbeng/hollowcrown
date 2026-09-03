@@ -169,20 +169,18 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal, zoom,
-   smooth follow + cursor ground-aim (Aim) + reticle decal + occlusion fade shader.
-   Screenshot: camera behind wall must NOT hide the player.
-   NOTE (session 3): server browser UI AND dedicated server mode are DONE and verified
-   END-TO-END: headless boot green (flags --server --port --name --password --max-players
-   --mode --central parsed), heartbeat registered ("Ash Keep" with PW badge), browser
-   listed it, password-dialog join connected, registry showed players:1 server-side.
-   Still open (fold into later iterations, not separate tasks): realm handshake after
-   ENet connect (password check + spawn flow), match scene with actual combat.
-2. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment (Vision 6.2).
-3. Player controller: WASD camera-relative movement, sprint, dodge roll,
-   footstep/roll animation hooks.
-4. Combat core: ground-projected hitboxes, telegraph decals, damage numbers,
-   death/respawn, killfeed; Warden kit complete (chain, bash, warcry, wall).
+1. Duel arena v1 (Vision 6.6/6.5): broken ring wall, gothic arches, torch
+   braziers (mesh + ember light) at spawn, central obelisk, rubble piles,
+   banners; grow camera_test.tscn/ArenaTest.cs into it. Screenshot gate: the
+   arena must say "dark fantasy" at a glance. KEEP the collider lesson: any
+   mesh offset from its body origin must be mirrored on CollisionShape3D.
+2. Player controller: WASD camera-relative movement, sprint, dodge roll,
+   footstep/roll animation hooks (stand-in capsule + rig already wired).
+3. Combat core: ground-projected hitboxes (Aim.cs + reticle verified),
+   telegraph decals, damage numbers, death/respawn, killfeed; Warden kit
+   complete (chain, bash, warcry, wall).
+4. Realm handshake after ENet connect (password check + spawn flow) — join
+   currently connects but spawns nothing (session 3 note).
 5. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
 6. Balance harness v1: bot mirror matches, winrate matrix printed.
 7. XP/leveling + progression sync to central + results screen.
@@ -191,6 +189,19 @@ compile check (remote or local):
 10. Skirmish mode (3v3) + team spawns/score.
 11. Open world zone: village chunks, shrines, roaming elites, minimap.
 12. Matchmaking quick-play flow via central.
-13. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
+13. Atmosphere pass 2: rain, embers, banner sway, ambience audio; dial fog/
+    exposure for grim mood (readability first — current 0.004/0.008 fog,
+    exposure 1.35 reads well).
 14. Windows + Linux export presets + dedicated server headless export.
 15. Robustness: disconnects, rejoin, XP/MMR validation caps.
+
+SESSION 4 NOTE — isometric camera rig is DONE and verified end-to-end
+(Screenshots/camera_test.tscn, run via playtester scene_path): ortho yaw 45 /
+pitch -50 / size 12 proven numerically; smooth-follow converged onto a
+teleport; cursor ground-aim reticle EXACT (delta 0 vs ray-plane math);
+occlusion fade triggers (player visible through 4m wall) and restores to
+opaque; zoom 12->13 per wheel step, clamps 8/18 verified via direct handler
+calls. Known harness gap: synthetic mouse wheel events (parse_input_event,
+push_input, push_unhandled_input) do NOT reach C# _UnhandledInput in the
+bridge environment — verify zoom by calling rig._unhandled_input(ev), real
+OS wheel is unaffected. Wayland: Input.warp_mouse is a no-op on the remote.
