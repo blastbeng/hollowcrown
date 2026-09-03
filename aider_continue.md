@@ -152,33 +152,32 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Bootstrap: Hollowcrown.sln (game + central + shared), minimal C# main
-   scene, dotnet build green, Godot-MCP/playtester plugin installed and
-   reachable on 192.168.1.29:6550, tools/remote_test.sh run green. Fill
-   Section 4b tool map.
-2. Central server v1: auth (register/login, salted hashes) + characters
-   CRUD + SQLite + heartbeat registry. test.sh boots it and curl-checks.
-3. Client login/register UI + token storage + character select/create.
-4. Dedicated server mode: --server flags, heartbeat to central, headless
-   boot test green.
-5. Server browser UI: list from central, password prompt, direct IP join.
-6. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal,
-   zoom, smooth follow + cursor ground-aim (Aim) + reticle decal + occlusion
-   fade shader. Screenshot: camera behind wall must NOT hide the player.
-7. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment
-   (Vision 6.2).
-8. Player controller: WASD camera-relative movement, sprint, dodge roll,
+1. Remote playtest of the new login/character UI (task 3 code is committed, built
+   and headless-verified): reconnect the godot-playtester MCPs in the client first
+   (bridge said "closed client" after the 13:44 MCP reconfig; if the bridge slot is
+   held, kill orphaned godot-mcp node processes older than the current session, then
+   remote_test.sh --restart). Evidence needed: login screen shot, character screen
+   shot, keyboard login flow (Enter: user -> password -> submit; account
+   "keysmith" / "secret123" exists on the remote central), console clean.
+2. Server browser UI: list from central, password prompt, direct IP join; enable
+   the disabled "Server Browser" button on CharacterSelect.
+3. Dedicated server mode: --server flags, heartbeat to central, headless boot test green.
+4. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal, zoom,
+   smooth follow + cursor ground-aim (Aim) + reticle decal + occlusion fade shader.
+   Screenshot: camera behind wall must NOT hide the player.
+5. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment (Vision 6.2).
+6. Player controller: WASD camera-relative movement, sprint, dodge roll,
    footstep/roll animation hooks.
-9. Combat core: ground-projected hitboxes, telegraph decals, damage numbers,
+7. Combat core: ground-projected hitboxes, telegraph decals, damage numbers,
    death/respawn, killfeed; Warden kit complete (chain, bash, warcry, wall).
-10. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
-11. Balance harness v1: bot mirror matches, winrate matrix printed.
-12. XP/leveling + progression sync to central + results screen.
-13. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-14. MMR/Elo reporting + leaderboard UI + tiers.
-15. Skirmish mode (3v3) + team spawns/score.
-16. Open world zone: village chunks, shrines, roaming elites, minimap.
-17. Matchmaking quick-play flow via central.
-18. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
-19. Windows + Linux export presets + dedicated server headless export.
-20. Robustness: disconnects, rejoin, XP/MMR validation caps.
+8. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
+9. Balance harness v1: bot mirror matches, winrate matrix printed.
+10. XP/leveling + progression sync to central + results screen.
+11. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+12. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
+13. Skirmish mode (3v3) + team spawns/score.
+14. Open world zone: village chunks, shrines, roaming elites, minimap.
+15. Matchmaking quick-play flow via central.
+16. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
+17. Windows + Linux export presets + dedicated server headless export.
+18. Robustness: disconnects, rejoin, XP/MMR validation caps.
