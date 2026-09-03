@@ -17,6 +17,11 @@
 - If the Godot editor is closed on the remote host, open it over SSH
   (remote_test.sh launches it automatically; manual command in Section 4).
   Check port 6550 first — never assume the editor is running.
+- If the playtester MCP still cannot connect while godot IS online and
+  listening on the correct port (6550), AiderDesk may be holding an old MCP
+  session: fix with `sudo systemctl restart aiderdesk`, then retry the MCP
+  call. Also kill orphaned godot-mcp node processes older than the current
+  session (they hold the single-client bridge slot).
 - When unsure, prefer the action that produces testable evidence.
 
 ## 1. REMOTE TEST ENVIRONMENT (primary)
