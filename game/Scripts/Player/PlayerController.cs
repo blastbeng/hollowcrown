@@ -45,6 +45,8 @@ public partial class PlayerController : CharacterBody3D
     private float _bobPhase, _bobLastSin;
     private Vector3 _lastMoveDir = Vector3.Forward;
     private Vector3 _dodgeDir;
+    private Vector3 _rollAxisLocal;   // tumble axis in body space, frozen at dodge start
+    private static readonly Vector3 CapsuleCenter = new(0f, 0.9f, 0f);  // 1.8 m capsule mid-height
     private Camera3D? _cam;
 
     public override void _Ready()
@@ -135,6 +137,10 @@ public partial class PlayerController : CharacterBody3D
         Stamina -= DodgeCost;
         _staminaIdleTimer = StaminaRegenDelay;
         _dodgeDir = _lastMoveDir;
+        var axisWorld = Vector3.Up.Cross(_dodgeDir);
+        if (axisWorld.LengthSquared() < 0.001f)
+            axisWorld = Vector3.Right;
+        _rollAxisLocal = GlobalBasis.Inverse() * axisWorld.Normalized();
         _dodgeTimer = DodgeDuration;
         _dodgeCdTimer = DodgeCooldown;
         IsDodging = true;
@@ -151,7 +157,8 @@ public partial class PlayerController : CharacterBody3D
         if (_dodgeTimer <= 0f)
         {
             IsDodging = false;
-            _visualRoot.GlobalBasis = Basis.Identity;   // end the roll pose
+            _visualRoot.Basis = Basis.Identity;          // end the roll pose
+            _visualRoot.Position = Vector3.Zero;         // restore bob pivot
         }
     }
 
@@ -217,14 +224,16 @@ public partial class PlayerController : CharacterBody3D
 
     private void AnimateDodgeSpin(float delta)
     {
-        // Roll around the horizontal axis perpendicular to the dodge dir.
-        var axis = Vector3.Up.Cross(_dodgeDir);
-        if (axis.LengthSquared() < 0.001f)
-            axis = Vector3.Right;
-        axis = axis.Normalized();
+        // Roll around the capsule CENTER (0.9 m up), not the feet: pivoting at
+        // the feet orbits the capsule 0.9 m INTO the floor at 180 deg (caught
+        // by the playtester visual gate). Composite local transform =
+        // rotation R about the center c:  p -> c + R*(p - c)  =>  T = R,
+        // origin = c - R*c.  Axis is frozen in body space (yaw is locked
+        // while dodging), so the tumble reads as a forward roll.
         float t = Mathf.Clamp(1f - _dodgeTimer / DodgeDuration, 0f, 1f);
-        float angle = Mathf.Lerp(0f, Mathf.Tau, t);  // one full roll
-        _visualRoot.GlobalBasis = new Basis(axis, angle);
+        var r = new Basis(_rollAxisLocal, Mathf.Lerp(0f, Mathf.Tau, t));
+        _visualRoot.Basis = r;
+        _visualRoot.Position = CapsuleCenter - r * CapsuleCenter;
     }
 
     /// <summary>Rich state for the playtester runtime digest (mcp_watch).</summary>
