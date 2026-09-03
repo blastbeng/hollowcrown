@@ -40,7 +40,7 @@ public partial class ArenaTest : Node3D
             AmbientLightColor = Color.FromHtml("1a1a22"),
             AmbientLightEnergy = 1.6f,
             TonemapMode = Godot.Environment.ToneMapper.Aces,
-            TonemapExposure = 1.0f,
+            TonemapExposure = 1.35f,
             FogEnabled = true,
             FogLightColor = Color.FromHtml("0e0f13"),
             FogDensity = 0.004f,
@@ -56,7 +56,7 @@ public partial class ArenaTest : Node3D
         var sun = new DirectionalLight3D
         {
             LightColor = Color.FromHtml("9aa7c0"),
-            LightEnergy = 1.3f,
+            LightEnergy = 1.6f,
             ShadowEnabled = true,
         };
         sun.RotationDegrees = new Vector3(-55f, 30f, 0f);
