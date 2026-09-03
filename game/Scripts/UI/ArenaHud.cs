@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using Hollowcrown.Combat;
+using Hollowcrown.Networking;
 using Hollowcrown.Player;
 
 namespace Hollowcrown.UI;
@@ -24,7 +25,10 @@ public partial class ArenaHud : CanvasLayer
     private PanelContainer _targetFrame = null!;
     private ProgressBar _targetHp = null!;
     private Label _targetText = null!;
+    private PanelContainer _feedPanel = null!;
+    private VBoxContainer _feed = null!;
     private readonly List<Slot> _slots = new();
+    private readonly List<(Label Label, float Age)> _feedLines = new();
 
     private sealed class Slot
     {
@@ -52,7 +56,10 @@ public partial class ArenaHud : CanvasLayer
 
         BuildAbilityBar(root);
         BuildTargetFrame(root);
-        GD.Print("ARENA HUD READY — ability bar (Q/E/R/F sweeps), stamina, target frame");
+        BuildKillFeed(root);
+        if (CombatAuthority.For(this) is { } auth)
+            auth.KillFeed += AddKillFeed;   // server-broadcast killfeed
+        GD.Print("ARENA HUD READY — ability bar (Q/E/R/F sweeps), stamina, target frame, killfeed");
     }
 
     // ------------------------------ Ability bar ---------------------------
@@ -208,6 +215,50 @@ public partial class ArenaHud : CanvasLayer
         vbox.AddChild(_targetText);
     }
 
+    // ------------------------------- Killfeed ------------------------------
+
+    private void BuildKillFeed(Control root)
+    {
+        _feedPanel = new PanelContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false,
+        };
+        _feedPanel.AddThemeStyleboxOverride("panel",
+            SlotBox(new Color(0.05f, 0.045f, 0.06f, 0.6f), new Color(0, 0, 0, 0)));
+        _feedPanel.AnchorLeft = 1f; _feedPanel.AnchorRight = 1f;
+        _feedPanel.AnchorTop = 0f; _feedPanel.AnchorBottom = 0f;
+        _feedPanel.OffsetLeft = -280f; _feedPanel.OffsetRight = -12f;
+        _feedPanel.OffsetTop = 12f; _feedPanel.OffsetBottom = 150f;
+        root.AddChild(_feedPanel);
+
+        _feed = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        _feed.Alignment = BoxContainer.AlignmentMode.End;   // newest lines sit low, feed grows upward
+        _feedPanel.AddChild(_feed);
+    }
+
+    /// <summary>Killfeed line — fed by the CombatAuthority broadcast (Vision
+    /// 6.10). Newest at the bottom; lines fade after 4 s.</summary>
+    public void AddKillFeed(string text)
+    {
+        var label = new Label
+        {
+            Text = text,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        label.AddThemeFontSizeOverride("font_size", 12);
+        label.AddThemeColorOverride("font_color", Color.FromHtml("d8cfc0"));   // bone
+        _feed.AddChild(label);
+        _feedLines.Add((label, 0f));
+        while (_feedLines.Count > 5)
+        {
+            _feedLines[0].Label.QueueFree();
+            _feedLines.RemoveAt(0);
+        }
+        _feedPanel.Visible = true;
+    }
+
     // -------------------------------- Update ------------------------------
 
     public override void _Process(double delta)
@@ -249,6 +300,25 @@ public partial class ArenaHud : CanvasLayer
             _targetHp.Value = target.Hp;
             _targetText.Text = $"{target.Hp}/{target.MaxHp}";
         }
+
+        // Killfeed fade (age > 4 s fades out, gone by 5.5 s).
+        for (int i = _feedLines.Count - 1; i >= 0; i--)
+        {
+            var (label, age) = _feedLines[i];
+            age += (float)delta;
+            label.Modulate = new Color(1, 1, 1,
+                age > 4f ? Mathf.Clamp(1f - (age - 4f) / 1.5f, 0f, 1f) : 1f);
+            if (age > 5.5f)
+            {
+                label.QueueFree();
+                _feedLines.RemoveAt(i);
+            }
+            else
+            {
+                _feedLines[i] = (label, age);
+            }
+        }
+        _feedPanel.Visible = _feedLines.Count > 0;
     }
 
     private static StyleBoxFlat SlotBox(Color bg, Color border)

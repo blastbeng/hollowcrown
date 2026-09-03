@@ -13,6 +13,7 @@ namespace Hollowcrown.UI;
 public partial class ServerBrowser : Control
 {
     [Signal] public delegate void ClosedEventHandler();
+    [Signal] public delegate void RealmJoinedEventHandler();
 
     private CentralClient _central = null!;
     private VBoxContainer _list = null!;
@@ -270,7 +271,8 @@ public partial class ServerBrowser : Control
         _busy = false;
         if (Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected)
         {
-            SetStatus($"connected to {host}:{port} — realm handshake next", UiTheme.Accent);
+            SetStatus($"connected to {host}:{port} — entering realm", UiTheme.Accent);
+            EmitSignal(SignalName.RealmJoined);   // Main hides the menu and loads the arena
         }
         else
         {

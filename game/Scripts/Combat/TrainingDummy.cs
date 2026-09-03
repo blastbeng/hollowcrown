@@ -1,4 +1,5 @@
 using Godot;
+using Hollowcrown.Networking;
 using Hollowcrown.World;
 
 namespace Hollowcrown.Combat;
@@ -6,25 +7,30 @@ namespace Hollowcrown.Combat;
 /// <summary>
 /// Ground target for combat verification (Vision 6.5: an arena with only a
 /// floor is incomplete — combat needs something to hit). A gothic training
-/// post: dark wood post + bone head, 1.8 m tall (Vision 6.4). Damage is
-/// APPLIED here but never COMPUTED here — attackers call TakeDamage; the
-/// match server will own the numbers once combat goes online (Vision 2.3).
+/// post: dark wood post + bone head, 1.8 m tall (Vision 6.4).
+/// SERVER-AUTHORITATIVE (Vision 2.3): the dummy NEVER computes damage. It
+/// registers itself with the CombatAuthority, then mirrors what the authority
+/// broadcasts — damage numbers, stun ring, fall, respawn. HP shown in the
+/// HUD is the authoritative value, not a local guess.
 /// </summary>
-public partial class TrainingDummy : StaticBody3D
+public partial class TrainingDummy : StaticBody3D, ICombatTarget
 {
     [Signal] public delegate void DiedEventHandler();
     [Signal] public delegate void RespawnedEventHandler();
 
-    [Export] public int MaxHp = 100;              // BALANCE.md: dummy_hp
-    public int Hp { get; private set; }
-    public bool IsDead { get; private set; }
+    [Export] private int _maxHp = 100;            // BALANCE.md: dummy_hp
+    public int MaxHp => _maxHp;                   // ICombatTarget (authority-owned number)
+    public int Hp { get; private set; }           // mirror of the authority's value
+    public bool IsDead { get; private set; }      // mirror
+    public int CombatId { get; private set; }
+    public Vector3 CombatPosition => GlobalPosition;
+    public string DisplayName => "the Training Dummy";
 
     private const float FallDuration = 0.45f;
-    private const float RespawnDelay = 3.0f;
 
     private Node3D _visual = null!;
     private MeshInstance3D _post = null!, _head = null!, _stunRing = null!;
-    private float _fallTimer, _respawnTimer, _punchTimer, _stunTimer;
+    private float _fallTimer, _punchTimer, _stunTimer;
 
     public override void _Ready()
     {
@@ -72,38 +78,59 @@ public partial class TrainingDummy : StaticBody3D
             Position = new Vector3(0, 0.95f, 0),   // collider mirrors the raised visuals
         });
 
-        GD.Print("TRAINING DUMMY READY — 100 HP, group 'dummies'");
+        CombatAuthority.For(this)?.Register(this);   // join the authority's world
+
+        GD.Print("TRAINING DUMMY READY — 100 HP, damage flows through the match server");
     }
 
-    /// <summary>Apply a stun (Vision 7: shield bash 0.5 s). The marker ring
-    /// shows while the timer runs; a dead dummy ignores stuns.</summary>
-    public void Stun(float seconds)
+    public override void _ExitTree()
+    {
+        if (CombatId > 0)
+            CombatAuthority.For(this)?.Unregister(CombatId);
+    }
+
+    public void AssignCombatId(int id) => CombatId = id;
+
+    // ------------------- authority mirrors (all peers) ---------------------
+
+    public void OnHitApplied(int amount, bool heavy, int hpAfter)
+    {
+        if (amount <= 0)
+            return;
+        Hp = hpAfter;
+        DamageNumber.Spawn(this, GlobalPosition, amount, heavy);
+        _punchTimer = 0.12f;                        // scale punch = hit feedback
+    }
+
+    /// <summary>Authority-broadcast stun (Vision 7: shield bash 0.5 s).</summary>
+    public void OnStunned(float seconds)
     {
         if (IsDead || seconds <= 0f)
             return;
         _stunTimer = Mathf.Max(_stunTimer, seconds);
-        GD.Print($"TRAINING DUMMY STUNNED {seconds:0.00}s");
+        GD.Print($"TRAINING DUMMY STUNNED {seconds:0.00}s (authority)");
     }
 
-    /// <summary>Apply damage. Returns true if the hit landed (target alive).</summary>
-    public bool TakeDamage(int amount, bool heavy)
+    public void OnKilled()
     {
-        if (IsDead || amount <= 0)
-            return false;
-        Hp -= amount;
-        DamageNumber.Spawn(this, GlobalPosition, amount, heavy);
-        _punchTimer = 0.12f;                        // scale punch = hit feedback
-        if (Hp <= 0)
-        {
-            Hp = 0;
-            IsDead = true;
-            _fallTimer = FallDuration;
-            _respawnTimer = RespawnDelay;
-            EmitSignal(SignalName.Died);
-            GD.Print($"TRAINING DUMMY DOWN — respawning in {RespawnDelay:0.0}s");
-        }
-        return true;
+        IsDead = true;
+        _fallTimer = FallDuration;
+        EmitSignal(SignalName.Died);
+        GD.Print("TRAINING DUMMY DOWN (authority) — respawn scheduled server-side");
     }
+
+    public void OnRespawned(int hpAfter)
+    {
+        IsDead = false;
+        Hp = hpAfter;
+        _visual.RotationDegrees = Vector3.Zero;
+        _post.Transparency = 0f;
+        _head.Transparency = 0f;
+        EmitSignal(SignalName.Respawned);
+        GD.Print("TRAINING DUMMY RESPAWNED (authority) — full HP");
+    }
+
+    // ------------------------------ presentation ---------------------------
 
     public override void _Process(double deltaRaw)
     {
@@ -133,12 +160,8 @@ public partial class TrainingDummy : StaticBody3D
                 _post.Transparency = 1f - a;
                 _head.Transparency = 1f - a;
             }
-            else
-            {
-                _respawnTimer -= delta;
-                if (_respawnTimer <= 0f)
-                    Respawn();
-            }
+            // Respawn timing is server-owned; we stay down until the
+            // authority broadcasts TargetRespawned.
         }
         else if (_stunTimer > 0f)
         {
@@ -153,23 +176,12 @@ public partial class TrainingDummy : StaticBody3D
         }
     }
 
-    private void Respawn()
-    {
-        IsDead = false;
-        Hp = MaxHp;
-        _visual.RotationDegrees = Vector3.Zero;
-        _post.Transparency = 0f;
-        _head.Transparency = 0f;
-        EmitSignal(SignalName.Respawned);
-        GD.Print("TRAINING DUMMY RESPAWNED — 100 HP");
-    }
-
     /// <summary>Rich state for the playtester runtime digest (mcp_watch).</summary>
     public Godot.Collections.Dictionary _mcp_state() => new()
     {
         ["hp"] = Hp,
         ["max_hp"] = MaxHp,
         ["dead"] = IsDead,
-        ["respawn_in"] = Mathf.Max(0f, _respawnTimer),
+        ["combat_id"] = CombatId,
     };
 }

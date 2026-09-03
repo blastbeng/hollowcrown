@@ -1,5 +1,6 @@
 using Godot;
 using Hollowcrown.Core;
+using Hollowcrown.Networking;
 
 namespace Hollowcrown.Combat;
 
@@ -8,9 +9,10 @@ namespace Hollowcrown.Combat;
 /// combo while the window is open; the finisher is heavier. The hitbox is a
 /// GROUND-PROJECTED arc sector (radius x 120 deg) anchored on the player and
 /// aimed at the cursor ground point — the flash mesh IS the hitbox, drawn flat
-/// on the floor (Vision 6.9). Client-side slice: the match server will compute
-/// these hits once combat goes online (Vision 2.3); shapes and numbers live
-/// here and in BALANCE.md as the single source.
+/// on the floor (Vision 6.9). SERVER-AUTHORITATIVE (Vision 2.3): this client
+/// only draws the swing and REQUESTS hits by victim id; CombatAuthority
+/// validates range/arc/cooldown against its own world and computes every
+/// damage number (CombatTables -> BALANCE.md).
 /// </summary>
 public partial class WardenChain : Node3D
 {
@@ -20,10 +22,9 @@ public partial class WardenChain : Node3D
     [Export] public float ArcDegrees = 120f;
     [Export] public float ComboWindow = 0.9f;
 
-    private static readonly int[] Damage = { 20, 20, 35 };   // finisher heavier
+    private const int SwingCount = 3;             // swings in the chain
 
     private CharacterBody3D _body = null!;
-    private Player.PlayerController _pc = null!;
     private Camera3D? _cam;
     private MeshInstance3D? _arcFlash;
     private int _combo;
@@ -32,8 +33,7 @@ public partial class WardenChain : Node3D
     public override void _Ready()
     {
         _body = (CharacterBody3D)GetParent();
-        _pc = (Player.PlayerController)_body;
-        GD.Print("WARDEN CHAIN READY — Q/LMB: 3-hit sword arc (20/20/35), 120deg x 2.4m ground-projected hitbox");
+        GD.Print("WARDEN CHAIN READY — Q/LMB: 3-hit sword arc, 120deg x 2.4m ground-projected hitbox (damage server-computed)");
     }
 
     public override void _Process(double deltaRaw)
@@ -75,30 +75,35 @@ public partial class WardenChain : Node3D
             Mathf.RadToDeg(Mathf.Atan2(-facing.X, -facing.Z)), 0f);
 
         int index = _combo;
-        _combo = (_combo + 1) % Damage.Length;
+        _combo = (_combo + 1) % SwingCount;
         _comboTimer = ComboWindow;
 
         ShowArc(facing);
-        bool heavy = index == Damage.Length - 1;
-        int dmg = Mathf.RoundToInt(Damage[index] * _pc.DamageMultiplier);   // warcry buff (Vision 7)
-        int hits = 0;
+        var authority = CombatAuthority.For(this);
+        int attackId = index switch
+        {
+            0 => (int)AttackId.ChainLight,
+            1 => (int)AttackId.ChainMid,
+            _ => (int)AttackId.ChainFinisher,
+        };
+        // Local arc filter is PREDICTION only — the server re-validates every
+        // request against its own world before applying any damage.
+        int requests = 0;
         foreach (var node in GetTree().GetNodesInGroup("dummies"))
         {
             if (node is not TrainingDummy dummy)
                 continue;
             var to = dummy.GlobalPosition - _body.GlobalPosition;
             to.Y = 0f;
-            float dist = to.Length();
-            if (dist > Reach + 0.35f)              // + dummy half-width
+            if (to.Length() > Reach + 0.35f)       // + dummy half-width
                 continue;
-            float angle = Mathf.RadToDeg(facing.AngleTo(to.Normalized()));
-            if (angle > ArcDegrees * 0.5f)
+            if (Mathf.RadToDeg(facing.AngleTo(to.Normalized())) > ArcDegrees * 0.5f)
                 continue;
-            if (dummy.TakeDamage(dmg, heavy))
-                hits++;
+            authority?.RequestHit(dummy.CombatId, attackId, _body.GlobalPosition, facing);
+            requests++;
         }
         EmitSignal(SignalName.ChainSwing, index, aim);
-        GD.Print($"WARDEN SWING {index + 1}/3 dmg={dmg} hits={hits}");
+        GD.Print($"WARDEN SWING {index + 1}/3 attack={attackId} requests={requests} (server computes damage)");
     }
 
     /// <summary>Ground-projected arc sector flash — the visible hitbox.</summary>

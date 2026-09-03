@@ -1,5 +1,6 @@
 using Godot;
 using Hollowcrown.Core;
+using Hollowcrown.Networking;
 using Hollowcrown.Player;
 
 namespace Hollowcrown.Combat;
@@ -11,16 +12,16 @@ namespace Hollowcrown.Combat;
 /// cone flash flat on the floor (Vision 6.9); buff/block read as ground
 /// decals, not floating UI. Input note: Vision 1 lists QWER, but W is
 /// movement — skills bind to Q / E / R / F (BALANCE.md records it).
-/// Numbers live here and in BALANCE.md; the match server owns them once
-/// combat goes online (Vision 2.3).
+/// SERVER-AUTHORITATIVE (Vision 2.3): bash damage/stun and the warcry buff
+/// are computed server-side by CombatAuthority (CombatTables); this node
+/// draws the VFX, gates its own costs/cooldowns, and requests the hits.
 /// </summary>
 public partial class WardenKit : Node3D
 {
     // --- Shield bash (BALANCE.md: warden_bash) ---
     [Export] public float BashRadius = 3.2f;
     [Export] public float BashArcDegrees = 90f;
-    [Export] public int BashDamage = 15;
-    [Export] public float BashStunSeconds = 0.5f;   // Vision 7: 0.5 s stun
+    [Export] public float BashStunSeconds = 0.5f;   // Vision 7: 0.5 s stun (server-applied)
     [Export] public float BashStaminaCost = 20f;
     [Export] public float BashCooldown = 6f;
 
@@ -47,7 +48,7 @@ public partial class WardenKit : Node3D
     {
         _body = (CharacterBody3D)GetParent();
         _pc = (PlayerController)_body;
-        GD.Print("WARDEN KIT READY — E bash (cone stun), R warcry (+15%), F shield wall (2 s)");
+        GD.Print("WARDEN KIT READY — E bash (cone stun), R warcry (+15%), F shield wall (2 s); hits validated server-side");
     }
 
     public override void _Process(double deltaRaw)
@@ -98,7 +99,10 @@ public partial class WardenKit : Node3D
             Mathf.RadToDeg(Mathf.Atan2(-facing.X, -facing.Z)), 0f);
 
         ShowBashCone(facing);
-        int hits = 0;
+        // Prediction filter only — the server re-validates every request and
+        // computes the damage/stun (CombatTables: ShieldBash).
+        var authority = CombatAuthority.For(this);
+        int requests = 0;
         foreach (var node in GetTree().GetNodesInGroup("dummies"))
         {
             if (node is not TrainingDummy dummy)
@@ -109,13 +113,11 @@ public partial class WardenKit : Node3D
                 continue;
             if (Mathf.RadToDeg(facing.AngleTo(to.Normalized())) > BashArcDegrees * 0.5f)
                 continue;
-            if (dummy.TakeDamage(BashDamage, heavy: true))
-            {
-                dummy.Stun(BashStunSeconds);          // Vision 7: 0.5 s stun
-                hits++;
-            }
+            authority?.RequestHit(dummy.CombatId, (int)AttackId.ShieldBash,
+                _body.GlobalPosition, facing);
+            requests++;
         }
-        GD.Print($"WARDEN BASH dmg={BashDamage} stun={BashStunSeconds:0.0}s hits={hits} cd={BashCooldown:0.0}s");
+        GD.Print($"WARDEN BASH stun={BashStunSeconds:0.0}s requests={requests} cd={BashCooldown:0.0}s (server computes damage)");
     }
 
     /// <summary>Ground-projected cone flash — the visible bash hitbox.</summary>
@@ -150,7 +152,9 @@ public partial class WardenKit : Node3D
         if (_warcryCd > 0f || _pc.IsDodging)
             return;
         _warcryCd = WarcryCooldown;
-        _pc.StartWarcry(WarcryDuration, WarcryBuffMultiplier);
+        _pc.StartWarcry(WarcryDuration, WarcryBuffMultiplier);   // local mirror/VFX
+        // The server owns buffs (sane-capped) — damage math happens there.
+        CombatAuthority.For(this)?.RequestBuff(WarcryBuffMultiplier);
         GD.Print($"WARDEN WARCRY +{(WarcryBuffMultiplier - 1f) * 100f:0}% for {WarcryDuration:0}s cd={WarcryCooldown:0}s");
     }
 
