@@ -44,4 +44,7 @@ public static class MaterialFactory
     public static StandardMaterial3D FloorStone() => Get("floor_stone", Color.FromHtml("a8a8b0"), 0.92f, uvScale: 10f);
     public static StandardMaterial3D WallStone() => Get("wall_stone", Color.FromHtml("b4b4bc"), 0.85f, occluder: true, uvScale: 3f);
     public static StandardMaterial3D PlayerSteel() => Get("player_steel", Color.FromHtml("d4d8e0"), 0.45f, metallic: 0.5f, uvScale: 2f);
+    public static StandardMaterial3D DarkStone() => Get("dark_stone", Color.FromHtml("808088"), 0.8f, uvScale: 3f);
+    public static StandardMaterial3D RubbleStone() => Get("rubble_stone", Color.FromHtml("9a9aa0"), 0.9f, uvScale: 1f);
+    public static StandardMaterial3D DarkWood() => Get("dark_wood", Color.FromHtml("6a5540"), 0.85f, uvScale: 1f);
 }

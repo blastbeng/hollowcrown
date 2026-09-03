@@ -18,6 +18,11 @@ public partial class ArenaTest : Node3D
         BuildEnvironment();
         BuildFloor();
         BuildWall();
+        BuildRingWall();
+        BuildObelisk();
+        BuildBrazier(-3.5f, 2.2f, -3.5f);   // spawn side
+        BuildBrazier(3.5f, 2.2f, 3.5f);     // obelisk side
+        BuildRubble();
         BuildPlayer();
         BuildCameraAndHelpers();
         GD.Print("ARENA TEST READY — iso camera rig, cursor aim reticle, occlusion fade live");
@@ -61,16 +66,118 @@ public partial class ArenaTest : Node3D
         };
         sun.RotationDegrees = new Vector3(-55f, 30f, 0f);
         AddChild(sun);
+    }
 
-        // Torch light near the player (ember palette); flicker comes with the
-        // atmosphere pass (Vision 6.2 noise flicker).
-        AddChild(new OmniLight3D
+    /// <summary>Broken ring wall around the duel ground (Vision 6.6): 10
+    /// segments on a 14 m circle, two knocked out as the "breach".</summary>
+    private void BuildRingWall()
+    {
+        for (int i = 0; i < 10; i++)
         {
-            LightColor = Color.FromHtml("e08a3c"),
+            if (i == 3 || i == 7)
+                continue;  // the breach
+
+            float angle = Mathf.Tau * i / 10f;
+            var segment = new StaticBody3D { Name = $"RingWall{i}" };
+            segment.AddToGroup("occluder");
+            float height = (i == 5) ? 2.5f : 4f;  // one crumbled half-height piece
+            segment.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(7.5f, height, 0.7f) },
+                MaterialOverride = MaterialFactory.WallStone(),
+                Position = new Vector3(0, height / 2f, 0),
+            });
+            segment.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(7.5f, height, 0.7f) },
+                Position = new Vector3(0, height / 2f, 0),
+            });
+            segment.Position = new Vector3(Mathf.Sin(angle) * 14f, 0, Mathf.Cos(angle) * 14f);
+            segment.RotationDegrees = new Vector3(0f, Mathf.RadToDeg(angle) + 90f, 0f);
+            AddChild(segment);
+        }
+    }
+
+    /// <summary>Central obelisk: dark tapered stone, the arena's landmark.</summary>
+    private void BuildObelisk()
+    {
+        var obelisk = new StaticBody3D { Name = "Obelisk" };
+        obelisk.AddChild(new MeshInstance3D
+        {
+            Mesh = new CylinderMesh
+            {
+                TopRadius = 0.25f, BottomRadius = 0.6f, Height = 5f,
+                RadialSegments = 4,
+            },
+            MaterialOverride = MaterialFactory.DarkStone(),
+            Position = new Vector3(0, 2.5f, 0),
+        });
+        obelisk.AddChild(new CollisionShape3D
+        {
+            Shape = new BoxShape3D { Size = new Vector3(0.9f, 5f, 0.9f) },
+            Position = new Vector3(0, 2.5f, 0),
+        });
+        obelisk.Position = new Vector3(6f, 0, -6f);
+        AddChild(obelisk);
+    }
+
+    /// <summary>Brazier: iron bowl on a dark-wood post with an ember light.</summary>
+    private void BuildBrazier(float x, float y, float z)
+    {
+        var brazier = new Node3D { Name = "Brazier" };
+        brazier.AddChild(new MeshInstance3D
+        {
+            Mesh = new CylinderMesh { TopRadius = 0.45f, BottomRadius = 0.3f, Height = 0.4f },
+            MaterialOverride = MaterialFactory.PlayerSteel(),
+            Position = new Vector3(0, 1.15f, 0),
+        });
+        brazier.AddChild(new MeshInstance3D
+        {
+            Mesh = new BoxMesh { Size = new Vector3(0.22f, 1f, 0.22f) },
+            MaterialOverride = MaterialFactory.DarkWood(),
+            Position = new Vector3(0, 0.5f, 0),
+        });
+        brazier.AddChild(new OmniLight3D
+        {
+            LightColor = Color.FromHtml("e08a3c"),       // ember (Vision 6.10)
             LightEnergy = 2.4f,
             OmniRange = 9f,
             ShadowEnabled = true,
-            Position = new Vector3(3.5f, 2.2f, 3.5f),
+            Position = new Vector3(0, 1.6f, 0),
+        });
+        brazier.Position = new Vector3(x, 0, z);
+        AddChild(brazier);
+    }
+
+    /// <summary>Rubble piles: seeded deterministic MultiMesh stones (Vision 6.7/6.13).</summary>
+    private void BuildRubble()
+    {
+        var rng = new RandomNumberGenerator { Seed = 1337 };  // deterministic (Vision 6)
+        var multi = new MultiMesh
+        {
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            Mesh = new BoxMesh { Size = new Vector3(0.5f, 0.35f, 0.4f) },
+            InstanceCount = 36,
+        };
+        for (int i = 0; i < 36; i++)
+        {
+            // Four piles: near the breach segments and by the obelisk.
+            float pileAngle = Mathf.Tau * (0.3f + 0.4f * (i % 2)) / 10f
+                              + (float)rng.RandfRange(-0.15f, 0.15f);
+            float pileDist = 12.5f + (float)rng.RandfRange(-1f, 1f);
+            var t = Transform3D.Identity;
+            t = t.Rotated(new Vector3(0, 1, 0), rng.RandfRange(0f, Mathf.Tau));
+            t = t.Scaled(new Vector3(1, 1, 1) * (float)rng.RandfRange(0.5f, 1.4f));
+            t.Origin = new Vector3(
+                Mathf.Sin(pileAngle) * pileDist + (i >= 18 ? 6f : 0f),
+                0.15f,
+                Mathf.Cos(pileAngle) * pileDist + (i >= 18 ? -6f : 0f));
+            multi.SetInstanceTransform(i, t);
+        }
+        AddChild(new MultiMeshInstance3D
+        {
+            Multimesh = multi,
+            MaterialOverride = MaterialFactory.RubbleStone(),
         });
     }
 
