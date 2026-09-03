@@ -1,11 +1,12 @@
 using Godot;
+using Hollowcrown.Networking;
 using Hollowcrown.UI;
 
 namespace Hollowcrown.Core;
 
 /// <summary>
-/// Boot + screen flow controller: login/register -> character select ->
-/// server browser. Later: lobby -> match (Section 6.10 flow).
+/// Boot + screen flow controller. Client: login/register -> character select ->
+/// server browser. Dedicated server: --server skips all UI and hosts a realm.
 /// </summary>
 public partial class Main : Node3D
 {
@@ -16,6 +17,16 @@ public partial class Main : Node3D
 
     public override void _Ready()
     {
+        foreach (var arg in OS.GetCmdlineUserArgs())
+        {
+            if (arg == "--server")
+            {
+                AddChild(new DedicatedServer { Name = "DedicatedServer" });
+                GD.Print("HOLLOWCROWN BOOT OK — dedicated server mode");
+                return;
+            }
+        }
+
         var ui = new CanvasLayer { Name = "RootUI" };
         AddChild(ui);
 

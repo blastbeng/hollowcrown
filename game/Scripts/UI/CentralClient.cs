@@ -95,6 +95,20 @@ public partial class CentralClient : Node
             : null;
     }
 
+    /// <summary>Match-server registry heartbeat (unauthenticated by design for now).</summary>
+    public async Task<bool> Heartbeat(ServerRegistration reg)
+    {
+        try
+        {
+            using var resp = await Http.PostAsJsonAsync($"{BaseUrl()}/servers/heartbeat", reg, JsonOpts);
+            return resp.IsSuccessStatusCode;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private async Task<HttpResponseMessage> Authed(HttpMethod method, string path, object? body = null)
     {
         var req = new HttpRequestMessage(method, $"{BaseUrl()}/{path}");
