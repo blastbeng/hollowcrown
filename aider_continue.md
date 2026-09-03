@@ -2,8 +2,9 @@
 
 ## 0. ALWAYS
 - Read project_vision.md first, then this file, then NEXT TASKS below.
-- Language: C# on Godot 4 (.NET), plus a C# ASP.NET central server.
-  GDScript is forbidden. Hollowcrown.sln at repo root:
+- Game: HOLLOWCROWN, dark fantasy ISOMETRIC PvP MMO (Diablo 2 / V Rising
+  controls). Language: C# on Godot 4 (.NET), plus a C# ASP.NET central
+  server. GDScript is forbidden. Hollowcrown.sln at repo root:
   game/ (Godot) + central/ (central server) + shared/ (DTOs).
 - Local repo = current working dir. Remote mirror = /opt/projects/Hollowcrown
   on Ubuntu PC 192.168.1.29 (synced via git: local push -> remote pull).
@@ -14,7 +15,7 @@
 - The godot-playtester MCP connects to the Godot instance on the remote
   Ubuntu PC at 192.168.1.29:6550. Its tools: run/stop project, scene tree,
   screenshots, logs/errors, input. Use exact tool names from the MCP client;
-  if a tool list is pasted in Section 5, use those names.
+  if a tool list is pasted in Section 4b, use those names.
 - The Godot store MCP and Blender MCP run in the local workspace (see
   project_vision.md Section 5 for when to use each).
 - SSH: ssh -i ~/.ssh/id_ed25519 blast@192.168.1.29 (Wayland desktop).
@@ -40,16 +41,18 @@
 5. If OK or GODOT_RUNNING -> use the godot-playtester MCP tools to:
    a. run the project / current scene;
    b. read errors and console output;
-   c. SCREENSHOTS: menu, character screen, arena view, combat action shot
-      (VFX + HUD visible);
-   d. interact: move, dodge, block/parry, attack, kill, respawn;
+   c. SCREENSHOTS: menu, character screen, WIDE isometric arena shot,
+      combat action shot (telegraphs + reticle + HUD visible);
+   d. interact: move (WASD), cursor-aim a skill, dodge, block/parry, attack,
+      kill, respawn; verify occlusion fade when behind walls;
    e. multiplayer smoke test if networking changed: dedicated server
       (headless --server) + client or bots connect and fight;
    f. if progression changed: login -> create/modify character -> save ->
       reload -> verify data.
 6. JUDGE the screenshots against project_vision.md Section 6. Gray boxes,
-   empty arenas, missing UI, floating props, faceless characters = fix NOW,
-   or make it the top task of the next iteration.
+   empty arenas, missing UI, floating props, faceless characters, camera
+   clipping through walls = fix NOW, or make it the top task of the next
+   iteration.
 7. HOST_OFFLINE -> skip the playtester this iteration: run
    bash tools/test.sh (dotnet build + local headless checks + central server
    boot check), review your diff, commit with "(remote host offline,
@@ -125,18 +128,23 @@ compile check (remote or local):
 4. Dedicated server mode: --server flags, heartbeat to central, headless
    boot test green.
 5. Server browser UI: list from central, password prompt, direct IP join.
-6. Duel arena v1: seeded procedural arena (6.5) + WorldEnvironment (6.1).
-7. Player controller: third-person camera, movement, sprint, dodge roll.
-8. Combat core: hitboxes, damage numbers, death/respawn, killfeed (Warden
-   kit complete: chain, bash, warcry, shield wall).
-9. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
-10. Balance harness v1: bot mirror matches, winrate matrix printed.
-11. XP/leveling + progression sync to central + results screen.
-12. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-13. MMR/Elo reporting + leaderboard UI + tiers.
-14. Skirmish mode (3v3) + team spawns/score.
-15. Open world zone: village chunks, shrines, roaming elites, minimap.
-16. Matchmaking quick-play flow via central.
-17. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
-18. Windows + Linux export presets + dedicated server headless export.
-19. Robustness: disconnects, rejoin, XP/MMR validation caps.
+6. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal,
+   zoom, smooth follow + cursor ground-aim (Aim) + reticle decal + occlusion
+   fade shader. Screenshot: camera behind wall must NOT hide the player.
+7. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment
+   (Vision 6.2).
+8. Player controller: WASD camera-relative movement, sprint, dodge roll,
+   footstep/roll animation hooks.
+9. Combat core: ground-projected hitboxes, telegraph decals, damage numbers,
+   death/respawn, killfeed; Warden kit complete (chain, bash, warcry, wall).
+10. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
+11. Balance harness v1: bot mirror matches, winrate matrix printed.
+12. XP/leveling + progression sync to central + results screen.
+13. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+14. MMR/Elo reporting + leaderboard UI + tiers.
+15. Skirmish mode (3v3) + team spawns/score.
+16. Open world zone: village chunks, shrines, roaming elites, minimap.
+17. Matchmaking quick-play flow via central.
+18. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
+19. Windows + Linux export presets + dedicated server headless export.
+20. Robustness: disconnects, rejoin, XP/MMR validation caps.

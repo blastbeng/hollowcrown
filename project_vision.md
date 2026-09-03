@@ -1,27 +1,35 @@
-# HOLLOWCROWN — SPEC v1 (dark fantasy PvP MMO; this file overrides all older docs)
+# HOLLOWCROWN — SPEC v2 (dark fantasy isometric PvP MMO; overrides all older docs)
 
 ## 0. READ FIRST (every session)
 1. LOOKS ARE THE GAME. Flat gray boxes, empty arenas, default materials =
    FAILED task. Grim dark-fantasy atmosphere is a core requirement, not polish.
-2. LANGUAGE: C# (.NET) on Godot 4.x. GDScript is FORBIDDEN. Every script is a
+2. ISOMETRIC. Fixed camera, ground telegraphs, silhouette-first characters.
+   A free-rotating or first/third-person camera is a spec violation.
+3. LANGUAGE: C# (.NET) on Godot 4.x. GDScript is FORBIDDEN. Every script is a
    `public partial class` in a file whose name equals the class name. The
    central server is also C#.
-3. ASSETS: search/install via the Godot store MCP before hand-building
+4. ASSETS: search/install via the Godot store MCP before hand-building
    anything. Only CC0 / CC-BY / MIT licenses. Log every install in
    ATTRIBUTION.md in the same commit. Blender MCP: use it whenever available.
-4. USE ALL MCP TOOLS: playtester (remote testing), Godot store (assets),
+5. USE ALL MCP TOOLS: playtester (remote testing), Godot store (assets),
    Blender (custom meshes), web search (verify APIs), GitHub search (license-
    safe reference patterns), Playwright (docs scraping). Timeboxed: one pass
    per need; browsing never consumes a whole iteration.
-5. Every iteration: implement -> dotnet build -> commit/push -> test per
+6. Every iteration: implement -> dotnet build -> commit/push -> test per
    aider_continue.md (remote playtester + screenshots) -> judge -> fix.
-6. Never restart or redesign the project. Evolve existing code.
-7. Windows + Linux desktop ONLY. No mobile targets anywhere.
-8. PvP IS THE GAME. Every system must serve skill-based PvP.
+7. Never restart or redesign the project. Evolve existing code.
+8. Windows + Linux desktop ONLY. No mobile targets anywhere.
+9. PvP IS THE GAME. Every system must serve skill-based PvP.
 
 ## 1. GAME
-HOLLOWCROWN — dark fantasy PvP MMO. Godot 4.x + C#/.NET, third-person camera.
+HOLLOWCROWN — dark fantasy ISOMETRIC PvP MMO. Godot 4.x + C#/.NET.
 - Grim atmospheric world: gothic ruins, perpetual dusk, fog, embers, rain.
+- Isometric ARPG controls (reference feel: Diablo 2 / V Rising / League):
+  - fixed camera: yaw 45 deg, pitch ~-50 deg, ORTHOGONAL projection,
+    smooth-follow the player, mouse-wheel zoom (ortho size 8-18),
+  - WASD movement relative to camera yaw, dodge roll on Space,
+  - ALL skills aim at the ground point under the mouse cursor; reticle decal
+    marks it; abilities on QWER / 1-4.
 - Heavily PvP-focused MMO with persistence: characters, classes, XP,
   equipment, and rank persist across ALL servers.
 - Host-your-own dedicated servers (Diablo 2 / DayZ / Rust model):
@@ -39,7 +47,8 @@ HOLLOWCROWN — dark fantasy PvP MMO. Godot 4.x + C#/.NET, third-person camera.
   (sword+shield), Nightblade (dual daggers), Revenant (dark sorcery). A 4th
   class (Bonecaller) comes later — design it data-driven from day one.
 - Combat is ACTIVE and skill-based: dodge rolls with i-frames, block/parry
-  timing, stamina, telegraphed abilities, hitboxes. NO tab-target.
+  timing, stamina, telegraphed abilities, GROUND-PROJECTED hitboxes
+  (circles, lines, cones on the floor plane). NO tab-target, NO homing.
 
 ## 2. HARD RULES
 1. C# only. File name == class name. `using Godot;` everywhere.
@@ -59,7 +68,8 @@ HOLLOWCROWN — dark fantasy PvP MMO. Godot 4.x + C#/.NET, third-person camera.
    committing. Never commit code that does not compile.
 
 ## 3. PRIORITY (choose next work in this order)
-1. Core combat feel: movement, dodge, block, parry, hit feedback.
+1. Camera rig + combat feel: iso camera, cursor aim, movement, dodge, block,
+   parry, hit feedback.
 2. One arena + one class fully playable end-to-end (host -> join -> fight ->
    death -> respawn).
 3. Dedicated server mode + central server round-trip (login -> character ->
@@ -129,7 +139,23 @@ HOLLOWCROWN — dark fantasy PvP MMO. Godot 4.x + C#/.NET, third-person camera.
 
 ## 6. VISUAL STANDARD (the most important section)
 
-### 6.1 Global atmosphere (do this once, early)
+### 6.1 Isometric camera (defines the whole look — build FIRST)
+- Rig: Node3D at the player, yaw LOCKED at 45 deg; child Camera3D with pitch
+  -50 deg, Projection = Orthogonal, Size 12 (mouse-wheel zoom 8-18), far
+  plane tight (~60 m). Smooth-follow with lerp. The camera NEVER free-
+  rotates (optional 90-deg snap rotation is a later task).
+- Aim: the ground plane (y=0) under the mouse cursor is the universal target.
+  Cursor reticle: a flat ring decal mesh that follows the aim point.
+- Level design for iso: flat arenas, elevation only via ramps and low
+  platforms (<= 1.5 m), waist-high walls preferred, NO tall occluders
+  between camera and player.
+- Occlusion fade (MANDATORY): every frame, query from camera to player;
+  any mesh hit gets a fade treatment (shader or transparency override to
+  ~0.2 alpha) and restores when clear. Never let walls hide the player.
+- Long dramatic shadows: DirectionalLight pitched ~-55 deg.
+- Reference feel: Diablo 2 / V Rising / League of Legends.
+
+### 6.2 Global atmosphere (do this once, early)
 WorldEnvironment: overcast ProceduralSkyMaterial; ambient #1a1a22, low
 energy; tonemap ACES, exposure ~1.0; fog #0e0f13 (volumetric on, desktop);
 SSAO on; subtle glow. Cold low-energy DirectionalLight #9aa7c0. Torch
@@ -137,16 +163,16 @@ OmniLights #e08a3c with script-driven flicker (noise on energy). Rain
 GPUParticles3D outdoors; ember particles near braziers. This alone turns
 "polygon space" into a grim battlefield.
 
-### 6.2 Materials — nothing visible keeps a default material
+### 6.3 Materials — nothing visible keeps a default material
 Every visible surface gets a material with an albedo texture: store texture
 packs when installed, else procedural NoiseTexture2D/GradientTexture2D via
-MaterialFactory (6.11). Roughness 0.6-0.95 varied. One static
+MaterialFactory (6.12). Roughness 0.6-0.95 varied. One static
 MaterialFactory with caching; reuse materials.
 
-### 6.3 Real-world scale (use everywhere)
+### 6.4 Real-world scale (use everywhere)
 | thing          | size                  |
 |----------------|-----------------------|
-| eye height     | 1.65 m                |
+| character      | 1.8 m tall            |
 | wall height    | 4 m (gothic)          |
 | doorway        | 2.2 H x 1.1 W m       |
 | arena side     | 30-60 m               |
@@ -156,50 +182,56 @@ MaterialFactory with caching; reuse materials.
 | tombstone      | 0.7-1.0 m tall        |
 Everything rests on the ground with collision. Nothing floats.
 
-### 6.4 Build order
+### 6.5 Build order
 MAP -> ARENA/ZONE -> STRUCTURES -> PROPS -> CHARACTER -> DETAILS.
 An arena with only a floor is INCOMPLETE.
 
-### 6.5 Arena/zone kits (one screenshot must say "dark fantasy")
+### 6.6 Arena/zone kits (one screenshot must say "dark fantasy")
 - Duel arena: broken ring wall, gothic arches, torch braziers at spawn,
   central obelisk, rubble, banners on poles.
 - Skirmish map: two fortified spawns, ruined chapel or bridge mid, choke
   points, spike/pit hazards.
 - Open world: ruined village chunks, shrine (objective), campfire camps,
   roaming elite mobs (light PvE for XP), contested shrines granting buffs.
+- Isometric readability: distinct ground materials per zone, clear paths,
+  silhouettes readable against the floor.
 - Props from store kits when possible; Blender for hero pieces; primitives
-  + textures as fallback. Retint everything to the palette (6.10).
+  + textures as fallback. Retint everything to the palette (6.11).
 
-### 6.6 Cheap details that sell the world (add everywhere)
+### 6.7 Cheap details that sell the world (add everywhere)
 Hanging chains (small cylinder segments); cobwebs (transparent quads);
 rubble piles (MultiMesh stones); mud/darkened patches (dark quads slightly
 above floor); waving banners (vertex-shader sway); fireflies/dust near
 torches; fog drift.
 
-### 6.7 Characters (required, not optional)
+### 6.8 Characters (required, not optional)
 - Rigged humanoid from the store, retinted: armor tint per class + a player
-  accent color. THIRD-PERSON means faces and armor are ALWAYS visible —
-  faceless mannequins are a FAILURE.
+  accent color. Isometric = SILHOUETTES CARRY READABILITY: each class needs
+  a distinct outline (Warden broad + shield, Nightblade slim + two blades,
+  Revenant hooded + staff). Faces still required on character models
+  (character screen, zoom) — faceless mannequins are a FAILURE.
 - Animations required: idle, run, attack chain, dodge roll, block, death,
   hit reaction. Store animation set, or Blender-rigged, or procedural
   sin() fallback — but SOMETHING must move.
 - Nameplate + class icon + HP bar above heads; enemy nameplates red.
 - Weapon meshes attached to hand bones/sockets; trails on swings.
 
-### 6.8 Combat VFX (readability is gameplay)
-Telegraphs: decal rings/cones on the ground, red for enemy casts. Hit
-sparks (GPUParticles3D) + damage numbers. Parry: white flash + 0.1 s hit
-stop. Dodge: short motion blur/trail. Blood mist: small and tasteful.
+### 6.9 Combat VFX (readability is gameplay)
+All telegraphs drawn FLAT ON THE GROUND (decal rings/cones/lines), red for
+enemy casts, aligned to actual hitboxes. Aim reticle under the cursor.
+Hit sparks (GPUParticles3D) + damage numbers. Parry: white flash + 0.1 s
+hit stop. Dodge: short motion blur/trail. Blood mist: small and tasteful.
 Death: ragdoll or fall + fade.
 
-### 6.9 UI bar
+### 6.10 UI bar
 One code-generated Theme for ALL screens: bg #121014, accent #b08d57,
 danger #7a1414, styled buttons/panels. Flow: splash -> login/register ->
 character select/create (class cards with renders) -> server browser
 (filters, ping, lock icon, direct IP join) -> lobby/queue -> match ->
 results (MMR delta with tier progress, XP bar, loot gained). HUD: HP,
 stamina, ability icons with cooldown sweeps, target frame, killfeed,
-minimap (open world), respawn timer on death.
+minimap (open world), respawn timer on death. Isometric HUD convention:
+bottom-center ability bar, HP/stamina above it.
 
 ### 6.10 Palette (do not invent random colors)
 | name      | hex     | use                    |
@@ -216,90 +248,97 @@ minimap (open world), respawn timer on death.
 | UI bg     | #121014 | UI background          |
 | UI accent | #b08d57 | UI accent / gold       |
 
-### 6.11 C# patterns (copy these habits into generators)
+### 6.12 C# patterns (copy these habits into generators)
 ```csharp
-// game/scripts/Core/MaterialFactory.cs — file name must match class name
-using Godot;
-using System.Collections.Generic;
-
-public static class MaterialFactory
-{
-    static readonly Dictionary<string, StandardMaterial3D> Cache = new();
-
-    public static StandardMaterial3D Flat(Color c, float rough = 0.9f)
-    {
-        string key = $"flat:{c}:{rough}";
-        if (Cache.TryGetValue(key, out var cached)) return cached;
-        var m = new StandardMaterial3D { AlbedoColor = c, Roughness = rough };
-        Cache[key] = m;
-        return m;
-    }
-
-    public static StandardMaterial3D Grime(Color baseColor, float rough = 0.9f)
-    {
-        string key = $"grime:{baseColor}:{rough}";
-        if (Cache.TryGetValue(key, out var cached)) return cached;
-        var m = new StandardMaterial3D
-        {
-            AlbedoColor = baseColor, // AlbedoColor multiplies AlbedoTexture
-            AlbedoTexture = new NoiseTexture2D
-            {
-                Noise = new FastNoiseLite { Frequency = 0.05f },
-                Width = 256, Height = 256,
-            },
-            Roughness = rough,
-        };
-        Cache[key] = m;
-        return m;
-    }
-}
-```
-```csharp
-// game/scripts/Core/Rating.cs — Elo + tiers (numbers also mirrored in BALANCE.md)
-public static class Rating
-{
-    public static int Expected(int a, int b) { /* Ea = 1 / (1 + 10^((Rb-Ra)/400)) */ throw new System.NotImplementedException(); }
-    public static int Update(int ra, int rb, bool aWon, double k = 32.0) { /* ra + k * (S - Ea) */ throw new System.NotImplementedException(); }
-    // TODO-FORBIDDEN: implement fully before committing — never ship stubs.
-}
-```
-```csharp
-// game/scripts/World/TorchFlicker.cs — attach to a light
+// game/scripts/Player/IsoCameraRig.cs — the isometric camera rig
 using Godot;
 
-public partial class TorchFlicker : OmniLight3D
+public partial class IsoCameraRig : Node3D
 {
-    FastNoiseLite _noise = new() { Frequency = 3f };
-    float _t = 0f;
+    [Export] public NodePath TargetPath;
+    [Export] public float ZoomStep = 1f, MinZoom = 8f, MaxZoom = 18f;
+
+    Node3D _target;
+    Camera3D _cam;
+
+    public override void _Ready()
+    {
+        _target = GetNode<Node3D>(TargetPath);
+        _cam = GetNode<Camera3D>("Camera3D");
+        RotationDegrees = new Vector3(0f, 45f, 0f);        // yaw locked
+        _cam.Projection = Camera3D.ProjectionType.Orthogonal;
+        _cam.Size = 12f;
+        _cam.Far = 60f;
+        _cam.Position = new Vector3(0f, 18f, 18f);         // above/behind
+        _cam.RotationDegrees = new Vector3(-50f, 0f, 0f);  // pitch down
+        Current = true;
+    }
 
     public override void _Process(double delta)
     {
-        _t += (float)delta * 4f;
-        LightEnergy = 2.2f + 0.7f * _noise.GetNoise1D(_t); // #e08a3c base
+        GlobalPosition = GlobalPosition.Lerp(_target.GlobalPosition,
+            1f - Mathf.Exp(-10f * (float)delta));          // smooth follow
+    }
+
+    public override void _UnhandledInput(InputEvent e)
+    {
+        if (e is InputEventMouseButton mb && mb.Pressed)
+        {
+            if (mb.ButtonIndex == MouseButton.WheelUp)
+                _cam.Size = Mathf.Max(MinZoom, _cam.Size - ZoomStep);
+            if (mb.ButtonIndex == MouseButton.WheelDown)
+                _cam.Size = Mathf.Min(MaxZoom, _cam.Size + ZoomStep);
+        }
     }
 }
 ```
+```csharp
+// game/scripts/Core/Aim.cs — cursor -> ground point (universal targeting)
+using Godot;
+
+public static class Aim
+{
+    public static Vector3 CursorGroundPoint(Camera3D cam)
+    {
+        var mouse = cam.GetViewport().GetMousePosition();
+        var from = cam.ProjectRayOrigin(mouse);
+        var dir = cam.ProjectRayNormal(mouse);
+        return new Plane(Vector3.Up, 0f).IntersectsRay(from, dir)
+               ?? cam.GlobalPosition;
+    }
+}
+```
+Material rule (MaterialFactory): every visible surface gets a cached
+StandardMaterial3D with an albedo texture (store texture or
+NoiseTexture2D/GradientTexture2D); AlbedoColor multiplies AlbedoTexture;
+roughness 0.6-0.95; never a default material on anything visible.
 Deterministic generation: `var rng = new RandomNumberGenerator { Seed = seed };`
+Elo lives in Rating.cs implemented FULLY (numbers in BALANCE.md; no stubs).
 C# gotchas: no `async void` in engine callbacks; never rename a .cs file
 without renaming the class; dispose long-lived manual Resources.
 
-### 6.12 Performance (desktop)
+### 6.13 Performance (desktop)
 60+ FPS on mid hardware: <= 8 shadow-casting dynamic lights near the camera
 (distant braziers shadowless); MultiMesh for tombstones/rubble/stones;
 texture <= 1024 px; reused materials; arena generation deterministic from a
 seed (server sends seed, clients build locally); bake NavigationRegion3D in
-code after generation.
+code after generation; fixed iso camera = stable frustum, set tight far
+planes and rely on VisibilityNotifier culling.
 
 ## 7. COMBAT & CLASSES (condensed)
 - Shared rules: stamina 100 (sprint/dodge/block drain), dodge roll 0.3 s
   i-frames, block -70% damage, parry window 0.25 s -> riposte, enemy
-  telegraphs 0.5-0.8 s, knockback small. Server computes all damage.
-- Warden: 3-hit sword chain; shield bash (0.5 s stun); warcry (ally buff);
-  shield wall (100% block, 2 s).
-- Nightblade: fast dual-dagger chain; shadow step (6 m blink, 8 s cd);
-  stealth 5 s (breaks on attack, next hit +50%); smoke bomb (enemy blind).
-- Revenant: bone spear (projectile); life drain (channel); grave grasp
-  (1 s root); soul ward (absorb shield). Arcane palette.
+  telegraphs 0.5-0.8 s (ground decals), knockback small. Server computes all
+  damage. Aiming: every skill targets the cursor ground point (Aim.cs);
+  hitboxes are ground-projected shapes (circle/line/cone) validated
+  server-side.
+- Warden: 3-hit sword arc chain; shield bash (0.5 s stun, cone); warcry
+  (ally buff radius); shield wall (100% block, 2 s).
+- Nightblade: fast dual-dagger chain; shadow step (6 m blink toward cursor,
+  8 s cd); stealth 5 s (breaks on attack, next hit +50%); smoke bomb
+  (enemy blind zone).
+- Revenant: bone spear (ground-line projectile); life drain (channel,
+  line); grave grasp (1 s root, circle); soul ward (absorb shield).
 - Design NEW content data-driven: classes/abilities/affixes live in data
   resources + BALANCE.md, so invention means editing data, not code.
 - BALANCE HARNESS: headless bot-vs-bot matches per class matchup, prints a
@@ -311,9 +350,9 @@ code after generation.
   (tune in BALANCE.md). Levels unlock abilities/passives/cosmetics; raw stat
   gain capped at +10% at max level (horizontal progression — MANDATORY for
   fair PvP).
-- MMR: Elo (6.11), start 1000, K=32, one MMR per mode. Tiers: Ash -> Iron ->
-  Bronze -> Silver -> Gold -> Obsidian -> Crown. Leaderboard per mode from
-  central; visible in client and results screen.
+- MMR: Elo (BALANCE.md numbers), start 1000, K=32, one MMR per mode. Tiers:
+  Ash -> Iron -> Bronze -> Silver -> Gold -> Obsidian -> Crown. Leaderboard
+  per mode from central; visible in client and results screen.
 - Matchmaking: Quick Play -> central returns the least-full live server for
   the mode (skill-aware later). Private matches: password servers + direct
   IP join. Party system is a later task.
@@ -333,9 +372,11 @@ Scripts report real errors and use exit codes. Never fake a successful build.
 ## 10. DONE = ALL GATES PASS
 1. `dotnet build Hollowcrown.sln`: zero errors.
 2. Runs with zero script errors in the remote test environment.
-3. Screenshot evidence exists (menu / character screen / arena / combat).
+3. Screenshot evidence exists (menu / character screen / isometric arena /
+   combat action with telegraphs + HUD).
 4. Visual standard (Section 6) respected in the changed area.
-5. Combat verified: move, dodge, block/parry, attack, kill, respawn.
+5. Combat verified: move, cursor-aim, dodge, block/parry, attack, kill,
+   respawn; camera never clips through walls (occlusion fade works).
 6. Multiplayer smoke test: dedicated server boots headless AND a client (or
    bots) connects and fights.
 7. If progression touched: central round-trip verified (login -> character
