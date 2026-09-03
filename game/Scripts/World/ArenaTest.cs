@@ -222,14 +222,11 @@ public partial class ArenaTest : Node3D
 
     private void BuildPlayer()
     {
-        _player = new Node3D { Name = "PlayerStandIn" };
-        _player.AddChild(new MeshInstance3D
-        {
-            Mesh = new CapsuleMesh { Radius = 0.35f, Height = 1.8f },  // 1.8 m character
-            MaterialOverride = MaterialFactory.PlayerSteel(),
-            Position = new Vector3(0, 0.9f, 0),
-        });
-        _player.Position = new Vector3(0, 0, -2);
+        // Player controller owns the 1.8 m capsule visual now (Vision 6.4):
+        // WASD camera-relative, sprint, dodge roll. Camera + occluder
+        // TargetPaths keep pointing at this same node.
+        _player = new PlayerController { Name = "Player" };
+        _player.Position = new Vector3(0, 0.2f, -2);
         AddChild(_player);
     }
 
