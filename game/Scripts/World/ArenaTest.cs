@@ -104,7 +104,11 @@ public partial class ArenaTest : Node3D
         {
             Shape = new BoxShape3D { Size = new Vector3(8, 4, 0.6f) },
         });
-        wall.Position = new Vector3(0, 0, 4);  // between the camera and the player
+        // On the camera->player diagonal, just behind the stand-in: with the
+        // fixed iso rig (pitch -50, offset 0,18,18) only geometry within ~3 m
+        // of the target can actually block the view ray — perfect occluder test.
+        wall.Position = new Vector3(1.5f, 0, -0.5f);
+        wall.RotationDegrees = new Vector3(0f, 45f, 0f);
         AddChild(wall);
     }
 
