@@ -186,6 +186,7 @@ public partial class CombatAuthority : Node
         if (password != DedicatedServer.RealmPassword)
         {
             GD.Print($"REALM: peer {peer} KICKED — wrong password");
+            _peers.Remove(peer);   // gone before it can spawn or fight
             (Multiplayer as SceneMultiplayer)?.DisconnectPeer(peer);
             return;
         }
