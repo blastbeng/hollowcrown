@@ -177,10 +177,11 @@ public partial class PlayerController : CharacterBody3D
         var v = Velocity;
         if (v.LengthSquared() < 0.25f)
             return;
-        float targetYaw = Mathf.Atan2(-v.X, -v.Z);   // body -Z faces velocity
+        float targetYawRad = Mathf.Atan2(-v.X, -v.Z);  // body -Z faces velocity
+        float currentRad = Mathf.DegToRad(RotationDegrees.Y);
         RotationDegrees = new Vector3(0f,
-            Mathf.LerpAngle(RotationDegrees.Y, Mathf.RadToDeg(targetYaw),
-                1f - Mathf.Exp(-TurnRate * delta)), 0f);
+            Mathf.RadToDeg(Mathf.LerpAngle(currentRad, targetYawRad,
+                1f - Mathf.Exp(-TurnRate * delta))), 0f);
     }
 
     // ---------------- Procedural animation (Vision 6.8 fallback) ----------
