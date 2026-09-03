@@ -169,18 +169,15 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Dedicated server mode: --server flags, heartbeat to central, headless boot test green.
-   NOTE (session 3): server browser UI is DONE and playtested (list from central with
-   empty-state, PW badge + password dialog, direct IP join verified END-TO-END against a
-   real ENet listener on :7799 — server logged PEER_CONNECTED; Back/Refresh/mode filter
-   work; zero console errors). The chosen password is captured in the UI but only travels
-   with the realm handshake once the dedicated server exists — wire it then. Test listener
-   script pattern: SceneTree._process + get_multiplayer() (bare `multiplayer` does not
-   parse in -s scripts; pkill -f patterns must use [b]racket trick or they kill the ssh
-   shell).
-3. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal, zoom,
+1. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal, zoom,
    smooth follow + cursor ground-aim (Aim) + reticle decal + occlusion fade shader.
    Screenshot: camera behind wall must NOT hide the player.
+   NOTE (session 3): server browser UI AND dedicated server mode are DONE and verified
+   END-TO-END: headless boot green (flags --server --port --name --password --max-players
+   --mode --central parsed), heartbeat registered ("Ash Keep" with PW badge), browser
+   listed it, password-dialog join connected, registry showed players:1 server-side.
+   Still open (fold into later iterations, not separate tasks): realm handshake after
+   ENet connect (password check + spawn flow), match scene with actual combat.
 4. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment (Vision 6.2).
 5. Player controller: WASD camera-relative movement, sprint, dodge roll,
    footstep/roll animation hooks.
