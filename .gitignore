@@ -5,5 +5,10 @@ obj/
 *.user
 *.tmp
 
+# Runtime data (central server SQLite database)
+*.db
+*.db-shm
+*.db-wal
+
 # Local assistant state
 .aider*
