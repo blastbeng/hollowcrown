@@ -248,5 +248,6 @@ public partial class ArenaTest : Node3D
         AddChild(new IsoCameraRig { Name = "IsoCameraRig", TargetPath = _player.GetPath() });
         AddChild(new Reticle { Name = "Reticle" });
         AddChild(new OcclusionFader { Name = "OcclusionFader", TargetPath = _player.GetPath() });
+        AddChild(new UI.ArenaHud { Name = "ArenaHud", PlayerPath = _player.GetPath() });   // Vision 6.10
     }
 }

@@ -39,6 +39,10 @@ public partial class WardenKit : Node3D
     private MeshInstance3D? _bashFlash, _warcryRing, _wallDisc;
     private float _bashCd, _warcryCd, _flashTimer;
 
+    /// <summary>Remaining cooldowns for the HUD (ArenaHud.cs sweeps).</summary>
+    public float BashCdRemaining => Mathf.Max(0f, _bashCd);
+    public float WarcryCdRemaining => Mathf.Max(0f, _warcryCd);
+
     public override void _Ready()
     {
         _body = (CharacterBody3D)GetParent();
