@@ -43,9 +43,9 @@ public partial class ArenaTest : Node3D
             TonemapExposure = 1.0f,
             FogEnabled = true,
             FogLightColor = Color.FromHtml("0e0f13"),
-            FogDensity = 0.012f,
+            FogDensity = 0.004f,
             VolumetricFogEnabled = true,
-            VolumetricFogDensity = 0.02f,
+            VolumetricFogDensity = 0.008f,
             SsaoEnabled = true,
             GlowEnabled = true,
             GlowIntensity = 0.5f,
@@ -103,6 +103,7 @@ public partial class ArenaTest : Node3D
         wall.AddChild(new CollisionShape3D
         {
             Shape = new BoxShape3D { Size = new Vector3(8, 4, 0.6f) },
+            Position = new Vector3(0, 2, 0),  // collider must match the raised mesh
         });
         // On the camera->player diagonal, just behind the stand-in: with the
         // fixed iso rig (pitch -50, offset 0,18,18) only geometry within ~3 m
