@@ -1,5 +1,6 @@
 using Godot;
 using System.Threading.Tasks;
+using Hollowcrown.Networking;
 using Hollowcrown.Shared;
 
 namespace Hollowcrown.UI;
@@ -258,6 +259,7 @@ public partial class ServerBrowser : Control
             SetStatus($"join failed: could not open socket to {host}:{port}", UiTheme.Danger);
             return;
         }
+        CombatAuthority.PendingPassword = password;   // presented at handshake
         Multiplayer.MultiplayerPeer = peer;
 
         // wait up to 3 s for the ENet handshake

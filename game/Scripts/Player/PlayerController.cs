@@ -1,4 +1,6 @@
 using Godot;
+using Hollowcrown.Combat;
+using Hollowcrown.Networking;
 using Hollowcrown.World;
 
 namespace Hollowcrown.Player;
@@ -12,7 +14,7 @@ namespace Hollowcrown.Player;
 /// Tunables are recorded in BALANCE.md; server-authoritative combat lands
 /// with the combat core task and will consume IsInvulnerable.
 /// </summary>
-public partial class PlayerController : CharacterBody3D
+public partial class PlayerController : CharacterBody3D, ICombatTarget
 {
     // --- Tunables (BALANCE.md: movement + stamina) ---
     [Export] public float WalkSpeed = 4.5f;
@@ -34,6 +36,64 @@ public partial class PlayerController : CharacterBody3D
     public bool IsDodging { get; private set; }
     public bool IsInvulnerable => IsDodging;        // Vision 7: i-frames
     public bool IsSprinting { get; private set; }
+    public int PeerId { get; private set; } = 1;    // ENet peer id == combat id
+
+    /// <summary>CombatAuthority assigns the ENet peer id after spawn approval
+    /// (boot-time registration uses the offline id 1).</summary>
+    public void AssignCombatId(int id) => PeerId = id;
+
+    // --- Server-authoritative combat mirror (ICombatTarget, Vision 2.3) ---
+    // The MATCH SERVER owns this HP number; the local value mirrors what the
+    // authority broadcasts and never drives gameplay decisions locally.
+    public int MaxHp => CombatAuthority.PlayerMaxHp;   // BALANCE.md: player_hp
+    public int Hp { get; private set; }
+    public bool IsDead { get; private set; }
+    public bool IsStunned => _stunTimer > 0f;
+    public int CombatId => PeerId;
+    public Vector3 CombatPosition => GlobalPosition;
+    public string DisplayName => $"Warden#{PeerId}";
+
+    private const float FallDuration = 0.45f;
+    private float _stunTimer, _fallTimer;
+
+    public void OnHitApplied(int amount, bool heavy, int hpAfter)
+    {
+        if (amount <= 0)
+            return;
+        Hp = hpAfter;
+        DamageNumber.Spawn(this, GlobalPosition, amount, heavy);
+    }
+
+    /// <summary>Authority-broadcast stun (shield bash): movement locked while
+    /// the timer runs; casting is gated in the kits.</summary>
+    public void OnStunned(float seconds)
+    {
+        if (IsDead || seconds <= 0f)
+            return;
+        _stunTimer = Mathf.Max(_stunTimer, seconds);
+        GD.Print($"WARDEN STUNNED {seconds:0.00}s (authority)");
+    }
+
+    public void OnKilled()
+    {
+        IsDead = true;
+        Velocity = Vector3.Zero;
+        _stunTimer = 0f;
+        _fallTimer = FallDuration;
+        GD.Print($"WARDEN DOWN ({DisplayName}) — respawn scheduled server-side");
+    }
+
+    public void OnRespawned(int hpAfter, Vector3 spawnPos)
+    {
+        IsDead = false;
+        Hp = hpAfter;
+        _visualRoot.RotationDegrees = Vector3.Zero;
+        _visualRoot.Position = Vector3.Zero;
+        _capsule.Transparency = 0f;
+        GlobalPosition = spawnPos;
+        Velocity = Vector3.Zero;
+        GD.Print($"WARDEN RESPAWNED ({DisplayName}) at {spawnPos} (authority)");
+    }
 
     // --- Shield wall + warcry buffs (Vision 7 Warden kit; WardenKit drives) ---
     [Export] public float WallStaminaDrain = 25f;   // BALANCE.md: wall_drain
@@ -78,6 +138,8 @@ public partial class PlayerController : CharacterBody3D
 
         FloorSnapLength = 0.4f;
         Stamina = StaminaMax;
+        Hp = MaxHp;
+        CombatAuthority.For(this)?.RegisterSelf(this);   // join the authority's world
         GD.Print("PLAYER CONTROLLER READY — WASD camera-relative, sprint, dodge roll (0.3 s i-frames)");
     }
 
@@ -86,12 +148,24 @@ public partial class PlayerController : CharacterBody3D
         float delta = (float)deltaRaw;
         _cam = GetViewport().GetCamera3D() ?? _cam;
 
+        if (IsDead)
+        {
+            UpdateDeathVisual(delta);      // stays down until the authority respawns us
+            return;
+        }
+        bool stunned = _stunTimer > 0f;
+        if (stunned)
+            _stunTimer -= delta;
+
         UpdateStamina(delta);
         UpdateDodgeTimers(delta);
-        HandleDodgeInput();
+        if (!stunned)
+            HandleDodgeInput();
         UpdateBuffTimers(delta);
 
-        var input = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+        var input = stunned
+            ? Vector2.Zero
+            : Input.GetVector("move_left", "move_right", "move_forward", "move_back");
         var moveDir = CameraRelative(input);
 
         if (IsDodging)
@@ -118,6 +192,21 @@ public partial class PlayerController : CharacterBody3D
         }
 
         MoveAndSlide();
+    }
+
+    /// <summary>Death presentation: pitch over with a slight lift so the lying
+    /// capsule rests ON the floor (rotation about the feet would half-bury it),
+    /// then fade. Respawn resets pose and position (authority-broadcast).</summary>
+    private void UpdateDeathVisual(float delta)
+    {
+        if (_fallTimer > 0f)
+        {
+            _fallTimer -= delta;
+            float t = 1f - Mathf.Max(0f, _fallTimer) / FallDuration;
+            _visualRoot.RotationDegrees = new Vector3(90f * t, 0, 0);
+            _visualRoot.Position = new Vector3(0, 0.35f * t, 0);
+            _capsule.Transparency = t * 0.6f;
+        }
     }
 
     /// <summary>WASD intent re-based on the camera yaw (Vision 1: movement is

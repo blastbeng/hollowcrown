@@ -12,6 +12,10 @@ namespace Hollowcrown.Networking;
 /// </summary>
 public partial class DedicatedServer : Node
 {
+    /// <summary>Realm password enforced at handshake (CombatAuthority);
+    /// empty string = open realm.</summary>
+    public static string RealmPassword = "";
+
     private CentralClient _central = null!;
     private string _serverId = "";
     private string _name = "Hollowcrown Realm";
@@ -26,6 +30,7 @@ public partial class DedicatedServer : Node
     {
         ParseArgs(OS.GetCmdlineUserArgs());
         ParseArgs(OS.GetCmdlineArgs());
+        RealmPassword = _password;
         _serverId = $"{System.Environment.MachineName.ToLowerInvariant()}:{_port}";
 
         var peer = new ENetMultiplayerPeer();

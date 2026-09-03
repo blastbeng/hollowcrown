@@ -29,6 +29,7 @@ public interface ICombatTarget
     /// <summary>Authority broadcast: HP reached zero — death visuals.</summary>
     void OnKilled();
 
-    /// <summary>Authority broadcast: back at full HP.</summary>
-    void OnRespawned(int hpAfter);
+    /// <summary>Authority broadcast: back at full HP, placed at the target's
+    /// spawn point (players teleport; static targets ignore the position).</summary>
+    void OnRespawned(int hpAfter, Vector3 spawnPos);
 }

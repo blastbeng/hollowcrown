@@ -1,6 +1,7 @@
 using Godot;
 using Hollowcrown.Core;
 using Hollowcrown.Networking;
+using Hollowcrown.Player;
 
 namespace Hollowcrown.Combat;
 
@@ -63,6 +64,10 @@ public partial class WardenChain : Node3D
 
     private void Swing()
     {
+        // No swinging while down or authority-stunned (Vision 7 control rules).
+        if (_body is PlayerController pc && (pc.IsDead || pc.IsStunned))
+            return;
+
         Vector3 aim = Aim.CursorGroundPoint(_cam!);
         var toAim = aim - _body.GlobalPosition;
         toAim.Y = 0f;

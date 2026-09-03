@@ -65,7 +65,9 @@ public partial class WardenKit : Node3D
             ShieldBash();
         if (Input.IsActionJustPressed("warden_warcry"))
             Warcry();
-        if (Input.IsActionJustPressed("warden_wall") && !_pc.IsShieldWalling && !_pc.IsDodging)
+        // No casting while down or authority-stunned (Vision 7 control rules).
+        if (Input.IsActionJustPressed("warden_wall") && !_pc.IsShieldWalling
+            && !_pc.IsDodging && !_pc.IsDead && !_pc.IsStunned)
             _pc.StartShieldWall(WallDuration);
 
         SyncWallDisc();
@@ -83,7 +85,8 @@ public partial class WardenKit : Node3D
 
     private void ShieldBash()
     {
-        if (_bashCd > 0f || _pc.IsDodging || !_pc.TrySpendStamina(BashStaminaCost))
+        if (_bashCd > 0f || _pc.IsDodging || _pc.IsDead || _pc.IsStunned ||
+            !_pc.TrySpendStamina(BashStaminaCost))
             return;
         _bashCd = BashCooldown;
 
@@ -149,7 +152,7 @@ public partial class WardenKit : Node3D
 
     private void Warcry()
     {
-        if (_warcryCd > 0f || _pc.IsDodging)
+        if (_warcryCd > 0f || _pc.IsDodging || _pc.IsDead || _pc.IsStunned)
             return;
         _warcryCd = WarcryCooldown;
         _pc.StartWarcry(WarcryDuration, WarcryBuffMultiplier);   // local mirror/VFX

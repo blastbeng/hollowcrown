@@ -78,7 +78,7 @@ public partial class TrainingDummy : StaticBody3D, ICombatTarget
             Position = new Vector3(0, 0.95f, 0),   // collider mirrors the raised visuals
         });
 
-        CombatAuthority.For(this)?.Register(this);   // join the authority's world
+        CombatAuthority.For(this)?.RegisterWorldTarget(this);   // join the authority's world
 
         GD.Print("TRAINING DUMMY READY — 100 HP, damage flows through the match server");
     }
@@ -119,7 +119,7 @@ public partial class TrainingDummy : StaticBody3D, ICombatTarget
         GD.Print("TRAINING DUMMY DOWN (authority) — respawn scheduled server-side");
     }
 
-    public void OnRespawned(int hpAfter)
+    public void OnRespawned(int hpAfter, Vector3 spawnPos)
     {
         IsDead = false;
         Hp = hpAfter;

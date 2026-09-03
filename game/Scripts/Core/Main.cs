@@ -23,6 +23,10 @@ public partial class Main : Node3D
 
     public override void _Ready()
     {
+        string joinHost = "";
+        int joinPort = 0;
+        string joinPassword = "";
+
         foreach (var arg in OS.GetCmdlineUserArgs())
         {
             if (arg == "--server")
@@ -34,6 +38,41 @@ public partial class Main : Node3D
                 GD.Print("HOLLOWCROWN BOOT OK — dedicated server mode, arena hosted");
                 return;
             }
+        }
+
+        // --join host:port [--password x]: direct-IP join without the menu
+        // (Vision 1: direct IP join is always available). Also the automated
+        // second client for multiplayer smoke tests.
+        var args = OS.GetCmdlineUserArgs();
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--join" && i + 1 < args.Length)
+            {
+                var parts = args[++i].Split(':');
+                if (parts.Length == 2 && int.TryParse(parts[1], out joinPort))
+                    joinHost = parts[0];
+            }
+            else if (args[i] == "--password" && i + 1 < args.Length)
+            {
+                joinPassword = args[++i];
+            }
+        }
+
+        if (joinHost.Length > 0)
+        {
+            CombatAuthority.PendingPassword = joinPassword;
+            var peer = new ENetMultiplayerPeer();
+            if (peer.CreateClient(joinHost, joinPort) == Error.Ok)
+            {
+                Multiplayer.MultiplayerPeer = peer;
+                GD.Print($"HOLLOWCROWN BOOT OK — joining realm at {joinHost}:{joinPort}");
+            }
+            else
+            {
+                GD.PrintErr($"JOIN FAILED: could not open socket to {joinHost}:{joinPort}");
+            }
+            EnterRealm();   // arena exists immediately; spawn lands on approval
+            return;
         }
 
         _ui = new CanvasLayer { Name = "RootUI" };
