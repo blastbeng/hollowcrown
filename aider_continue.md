@@ -169,18 +169,18 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Player controller: WASD camera-relative movement, sprint, dodge roll,
-   footstep/roll animation hooks (stand-in capsule + rig already wired;
-   move the PlayerStandIn, keep IsoCameraRig.TargetPath).
-2. Combat core: ground-projected hitboxes (Aim.cs + reticle verified),
-   telegraph decals, damage numbers, death/respawn, killfeed; Warden kit
-   complete (chain, bash, warcry, wall).
-3. Realm handshake after ENet connect (password check + spawn flow) — join
+1. Combat server authority (Vision 2.3): move damage computation to the match
+   server (ENet RPCs, server-side hit validation), player HP/death/respawn,
+   killfeed. Warden kit + dummy client-side slice DONE and verified (below).
+2. Realm handshake after ENet connect (password check + spawn flow) — join
    currently connects but spawns nothing (session 3 note).
-4. Arena polish (fold into atmosphere pass): grim dusk dial-in (fog 0.004/
-   volfog 0.008/exposure 1.15/sun 1.35 currently — sky + particles next),
-   rubble stones scale up ~2x, gothic arches need store assets or Blender.
-5. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
+3. Rigged class models: store humanoid with FACE + per-class silhouette
+   (Warden broad + shield), retint, weapon sockets, run/attack/roll/death
+   anims (Vision 6.8 — capsule stand-in is temporary).
+4. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
+5. Arena polish remainder: gothic arches (store assets or Blender), rubble
+   stones scale up ~2x, banner sway, chains/cobwebs (6.7), ember mote tuning
+   (currently reads as glow — want distinct rising sparks).
 6. Balance harness v1: bot mirror matches, winrate matrix printed.
 7. XP/leveling + progression sync to central + results screen.
 8. Loot: procedural items/affixes + inventory/equip UI + visual tint.
@@ -188,10 +188,35 @@ compile check (remote or local):
 10. Skirmish mode (3v3) + team spawns/score.
 11. Open world zone: village chunks, shrines, roaming elites, minimap.
 12. Matchmaking quick-play flow via central.
-13. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
+13. Atmosphere pass 2: ambience audio, fog drift, fireflies.
 14. Windows + Linux export presets + dedicated server headless export.
 15. Robustness: disconnects, rejoin, XP/MMR validation caps.
 
+SESSION 5 NOTE (2026-09-03) — Warden kit COMPLETE and verified end-to-end
+(vision 7): shield bash E (90deg x 3.2m cone flash, 15 dmg, 0.5s stun with
+bone ring marker), warcry R (+15% chain dmg 10s, 8m accent ring), shield
+wall F (100% block 2s, 25 stamina/s drain, steel disc, ends at empty).
+Combat math proven: dummy 100 -> 62 after bash+buffed chain (15 + 20*1.15 =
+38). Kill -> fall -> 3s respawn verified. Arena HUD DONE (vision 6.10):
+bottom-center Q/E/R/F ability bar with cooldown sweeps, stamina bar + number,
+top-center target frame with live dummy HP — all real state. Atmosphere
+particles DONE (6.2/6.7): ember motes in braziers (add-blend), slanted rain.
+Screenshots judged vs Section 6: telegraphs flat/palette-correct, HUD gate
+now passes in the arena scene.
+GOTCHAS (session 5): (7) bash/chain aim at the OS cursor ground point — the
+remote cursor sits at window (0,0); to hit a target place the PLAYER on the
+far side of the target from the cursor point (read it via
+project_ray_origin/normal of get_mouse_position, then position at
+target + dir*2). (8) exec GDScript: no `new Vector3` (Vector3() only);
+C# NATIVE properties need snake_case (global_position, rotation_degrees,
+velocity); C#-declared props keep PascalCase (Hp, Stamina). (9)
+godot_editor_edit restart did NOT restart the editor (check_stale stayed
+stale) — kill the editor via SSH then `bash tools/remote_test.sh --restart`,
+which works. (10) ParticleProcessMaterial.ColorRamp wants a
+GradientTexture1D, not Gradient. (11) target-typed `new(...)` fails inside
+operator expressions (CS8310) — write `new Vector3(...)`. (12) An old
+orphaned game window from a prior session can hold the display — kill stray
+godot processes before restarting the editor.
 SESSION 4 NOTE — isometric camera rig DONE and verified end-to-end
 (camera_test.tscn via playtester scene_path): ortho yaw 45 / pitch -50 /
 size 12 proven numerically; smooth-follow converged onto a teleport; cursor
