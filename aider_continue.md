@@ -179,9 +179,9 @@ compile check (remote or local):
    (Warden broad + shield), retint, weapon sockets, run/attack/roll/death
    anims (Vision 6.8 — capsule stand-in is temporary).
 3. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
-4. Arena polish remainder: gothic arches (store assets or Blender), rubble
-   stones scale up ~2x, banner sway, chains/cobwebs (6.7), ember mote tuning
-   (currently reads as glow — want distinct rising sparks).
+4. Arena polish remainder: gothic arches (store assets or Blender), banner
+   sway, chains/cobwebs (6.7), ember mote tuning (currently reads as glow —
+   want distinct rising sparks). (Rubble ~2x DONE, verified on screen.)
 5. Balance harness v1: bot mirror matches, winrate matrix printed.
 6. XP/leveling + progression sync to central + results screen.
 7. Loot: procedural items/affixes + inventory/equip UI + visual tint.
