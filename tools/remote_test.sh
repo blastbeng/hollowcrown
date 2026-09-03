@@ -42,7 +42,13 @@ else
   fi
 fi
 
-# 3) central server on :6560
+# 3) build the solution on the remote so the editor can load C# scripts
+BUILD_OUT=$(sshrun "cd $REMOTE_DIR && export DOTNET_ROOT=/usr/lib/dotnet; \
+          export PATH=\"\$PATH:/usr/lib/dotnet:/opt/dotnet\"; \
+          dotnet build Hollowcrown.sln -v minimal 2>&1") \
+  || { echo "SYNC_FAILED: remote dotnet build:"; echo "$BUILD_OUT" | tail -20; exit 3; }
+
+# 4) central server on :6560
 if ! port_up 6560; then
   sshrun "cd $REMOTE_DIR && ASPNETCORE_URLS=http://0.0.0.0:6560 \
           nohup dotnet run --project central >$CENTRAL_LOG 2>&1 </dev/null &" >/dev/null 2>&1
@@ -53,7 +59,7 @@ if ! port_up 6560; then
   fi
 fi
 
-# 4) Godot editor + playtester bridge on :6550 (Wayland session)
+# 5) Godot editor + playtester bridge on :6550 (Wayland session)
 if [ "$RESTART" = 1 ]; then
   sshrun "pkill -x godot >/dev/null 2>&1; true"; sleep 3
 fi
@@ -70,7 +76,7 @@ if ! port_up 6550; then
           export WAYLAND_DISPLAY=\${WD:-wayland-0}; \
           export DOTNET_ROOT=/usr/lib/dotnet; \
           export PATH=\"\$PATH:/usr/lib/dotnet:/opt/dotnet\"; \
-          nohup /usr/local/bin/godot --path $GAME_DIR >$GODOT_LOG 2>&1 </dev/null &" >/dev/null 2>&1
+          nohup /usr/local/bin/godot --editor --path $GAME_DIR >$GODOT_LOG 2>&1 </dev/null &" >/dev/null 2>&1
   UP=0
   for _ in $(seq 1 12); do sleep 2; port_up 6550 && { UP=1; break; }; done
   if [ "$UP" != 1 ]; then
