@@ -38,7 +38,7 @@ public partial class ArenaTest : Node3D
             Sky = new Sky { SkyMaterial = sky },
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
             AmbientLightColor = Color.FromHtml("1a1a22"),
-            AmbientLightEnergy = 1.1f,
+            AmbientLightEnergy = 1.6f,
             TonemapMode = Godot.Environment.ToneMapper.Aces,
             TonemapExposure = 1.0f,
             FogEnabled = true,
@@ -56,7 +56,7 @@ public partial class ArenaTest : Node3D
         var sun = new DirectionalLight3D
         {
             LightColor = Color.FromHtml("9aa7c0"),
-            LightEnergy = 1.0f,
+            LightEnergy = 1.3f,
             ShadowEnabled = true,
         };
         sun.RotationDegrees = new Vector3(-55f, 30f, 0f);
