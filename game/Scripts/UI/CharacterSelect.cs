@@ -7,6 +7,8 @@ namespace Hollowcrown.UI;
 /// <summary>Character select / create screen (vision Section 6.10 flow step 3).</summary>
 public partial class CharacterSelect : Control
 {
+    [Signal] public delegate void OpenServerBrowserEventHandler();
+
     private CentralClient _central = null!;
     private VBoxContainer _cards = null!;
     private LineEdit _newName = null!;
@@ -95,8 +97,8 @@ public partial class CharacterSelect : Control
         hint.AddThemeColorOverride("font_color", UiTheme.ColdSteel);
         box.AddChild(hint);
 
-        var enter = new Button { Text = "Server Browser (next task)" };
-        enter.Disabled = true;
+        var enter = new Button { Text = "Server Browser" };
+        enter.Pressed += () => EmitSignal(SignalName.OpenServerBrowser);
         box.AddChild(enter);
         return panel;
     }
