@@ -104,7 +104,10 @@ public partial class CharacterSelect : Control
     private void OnVisibilityChanged()
     {
         if (Visible && _central is { IsAuthenticated: true })
+        {
+            _newName.GrabFocus(); // keyboard flow: login -> type name -> Enter
             _ = Refresh();
+        }
     }
 
     private async Task Refresh()
