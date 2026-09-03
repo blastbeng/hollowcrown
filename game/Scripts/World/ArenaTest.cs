@@ -172,7 +172,9 @@ public partial class ArenaTest : Node3D
             float pileDist = 12.5f + (float)rng.RandfRange(-1f, 1f);
             var t = Transform3D.Identity;
             t = t.Rotated(new Vector3(0, 1, 0), rng.RandfRange(0f, Mathf.Tau));
-            t = t.Scaled(new Vector3(1, 1, 1) * (float)rng.RandfRange(0.5f, 1.4f));
+            // ~2x chunkier stones (Vision 6.7 note): 0.35 m pebbles read as
+            // noise at iso zoom; 0.5-1.4 m blocks read as battle debris.
+            t = t.Scaled(new Vector3(1, 1, 1) * (float)rng.RandfRange(1.0f, 2.8f));
             t.Origin = new Vector3(
                 Mathf.Sin(pileAngle) * pileDist + (i >= 18 ? 6f : 0f),
                 0.15f,
