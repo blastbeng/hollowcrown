@@ -169,18 +169,17 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Duel arena v1 (Vision 6.6/6.5): broken ring wall, gothic arches, torch
-   braziers (mesh + ember light) at spawn, central obelisk, rubble piles,
-   banners; grow camera_test.tscn/ArenaTest.cs into it. Screenshot gate: the
-   arena must say "dark fantasy" at a glance. KEEP the collider lesson: any
-   mesh offset from its body origin must be mirrored on CollisionShape3D.
-2. Player controller: WASD camera-relative movement, sprint, dodge roll,
-   footstep/roll animation hooks (stand-in capsule + rig already wired).
-3. Combat core: ground-projected hitboxes (Aim.cs + reticle verified),
+1. Player controller: WASD camera-relative movement, sprint, dodge roll,
+   footstep/roll animation hooks (stand-in capsule + rig already wired;
+   move the PlayerStandIn, keep IsoCameraRig.TargetPath).
+2. Combat core: ground-projected hitboxes (Aim.cs + reticle verified),
    telegraph decals, damage numbers, death/respawn, killfeed; Warden kit
    complete (chain, bash, warcry, wall).
-4. Realm handshake after ENet connect (password check + spawn flow) — join
+3. Realm handshake after ENet connect (password check + spawn flow) — join
    currently connects but spawns nothing (session 3 note).
+4. Arena polish (fold into atmosphere pass): grim dusk dial-in (fog 0.004/
+   volfog 0.008/exposure 1.15/sun 1.35 currently — sky + particles next),
+   rubble stones scale up ~2x, gothic arches need store assets or Blender.
 5. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
 6. Balance harness v1: bot mirror matches, winrate matrix printed.
 7. XP/leveling + progression sync to central + results screen.
@@ -189,19 +188,24 @@ compile check (remote or local):
 10. Skirmish mode (3v3) + team spawns/score.
 11. Open world zone: village chunks, shrines, roaming elites, minimap.
 12. Matchmaking quick-play flow via central.
-13. Atmosphere pass 2: rain, embers, banner sway, ambience audio; dial fog/
-    exposure for grim mood (readability first — current 0.004/0.008 fog,
-    exposure 1.35 reads well).
+13. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
 14. Windows + Linux export presets + dedicated server headless export.
 15. Robustness: disconnects, rejoin, XP/MMR validation caps.
 
-SESSION 4 NOTE — isometric camera rig is DONE and verified end-to-end
-(Screenshots/camera_test.tscn, run via playtester scene_path): ortho yaw 45 /
-pitch -50 / size 12 proven numerically; smooth-follow converged onto a
-teleport; cursor ground-aim reticle EXACT (delta 0 vs ray-plane math);
-occlusion fade triggers (player visible through 4m wall) and restores to
-opaque; zoom 12->13 per wheel step, clamps 8/18 verified via direct handler
-calls. Known harness gap: synthetic mouse wheel events (parse_input_event,
-push_input, push_unhandled_input) do NOT reach C# _UnhandledInput in the
-bridge environment — verify zoom by calling rig._unhandled_input(ev), real
-OS wheel is unaffected. Wayland: Input.warp_mouse is a no-op on the remote.
+SESSION 4 NOTE — isometric camera rig DONE and verified end-to-end
+(camera_test.tscn via playtester scene_path): ortho yaw 45 / pitch -50 /
+size 12 proven numerically; smooth-follow converged onto a teleport; cursor
+ground-aim reticle EXACT (delta 0 vs ray-plane math); occlusion fade
+triggers (player visible through 4m wall) and restores to opaque; zoom
+12->13 per wheel step, clamps 8/18 verified via direct handler calls.
+Duel arena v1 dressing DONE (ring wall + breach, obelisk, braziers, seeded
+MultiMesh rubble), zero script errors, screenshot gate passed.
+GOTCHAS (session 4): (1) NoiseTexture2D grayscale mean ~0.5 halves every
+AlbedoColor — double tints. (2) MeshInstance offset from body origin MUST be
+mirrored on CollisionShape3D (half-buried collider killed the fade ray).
+(3) Synthetic mouse wheel (parse_input_event / push_input /
+push_unhandled_input) never reaches C# _UnhandledInput in the bridge —
+verify via rig._unhandled_input(ev); real OS wheel unaffected. (4)
+Input.warp_mouse is a no-op on the remote (Wayland). (5) Runtime-added
+nodes get @Class@N names — find by type, not name. (6) exec GDScript: no
+parens on for-loops, Vector3() not new Vector3().
