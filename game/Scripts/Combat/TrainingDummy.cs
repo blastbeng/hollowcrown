@@ -23,8 +23,8 @@ public partial class TrainingDummy : StaticBody3D
     private const float RespawnDelay = 3.0f;
 
     private Node3D _visual = null!;
-    private MeshInstance3D _post = null!, _head = null!;
-    private float _fallTimer, _respawnTimer, _punchTimer;
+    private MeshInstance3D _post = null!, _head = null!, _stunRing = null!;
+    private float _fallTimer, _respawnTimer, _punchTimer, _stunTimer;
 
     public override void _Ready()
     {
@@ -48,6 +48,24 @@ public partial class TrainingDummy : StaticBody3D
         _visual.AddChild(_head);
         AddChild(_visual);
 
+        // Stun marker (Vision 6.9): a bone ring flat on the floor while
+        // stunned — readable at iso zoom, no floating icons.
+        _stunRing = new MeshInstance3D
+        {
+            Mesh = new TorusMesh { InnerRadius = 0.55f, OuterRadius = 0.75f },
+            MaterialOverride = new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                AlbedoColor = new Color(0.85f, 0.81f, 0.75f, 0.65f),   // bone
+                CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+            },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            Position = new Vector3(0, 0.06f, 0),
+            Visible = false,
+        };
+        AddChild(_stunRing);
+
         AddChild(new CollisionShape3D
         {
             Shape = new BoxShape3D { Size = new Vector3(0.55f, 1.9f, 0.55f) },
@@ -55,6 +73,16 @@ public partial class TrainingDummy : StaticBody3D
         });
 
         GD.Print("TRAINING DUMMY READY — 100 HP, group 'dummies'");
+    }
+
+    /// <summary>Apply a stun (Vision 7: shield bash 0.5 s). The marker ring
+    /// shows while the timer runs; a dead dummy ignores stuns.</summary>
+    public void Stun(float seconds)
+    {
+        if (IsDead || seconds <= 0f)
+            return;
+        _stunTimer = Mathf.Max(_stunTimer, seconds);
+        GD.Print($"TRAINING DUMMY STUNNED {seconds:0.00}s");
     }
 
     /// <summary>Apply damage. Returns true if the hit landed (target alive).</summary>
@@ -94,6 +122,8 @@ public partial class TrainingDummy : StaticBody3D
 
         if (IsDead)
         {
+            _stunTimer = 0f;                        // stun dies with the target
+            _stunRing.Visible = false;
             if (_fallTimer > 0f)                    // fall over: pitch to 90 deg
             {
                 _fallTimer -= delta;
@@ -109,6 +139,17 @@ public partial class TrainingDummy : StaticBody3D
                 if (_respawnTimer <= 0f)
                     Respawn();
             }
+        }
+        else if (_stunTimer > 0f)
+        {
+            _stunTimer -= delta;
+            _stunRing.Visible = true;
+            _stunRing.RotationDegrees = new Vector3(0f,
+                Mathf.RadToDeg(Time.GetTicksMsec() * 0.15f % 360f), 0f);   // spin = stunned
+        }
+        else
+        {
+            _stunRing.Visible = false;
         }
     }
 

@@ -23,6 +23,7 @@ public partial class WardenChain : Node3D
     private static readonly int[] Damage = { 20, 20, 35 };   // finisher heavier
 
     private CharacterBody3D _body = null!;
+    private Player.PlayerController _pc = null!;
     private Camera3D? _cam;
     private MeshInstance3D? _arcFlash;
     private int _combo;
@@ -31,6 +32,7 @@ public partial class WardenChain : Node3D
     public override void _Ready()
     {
         _body = (CharacterBody3D)GetParent();
+        _pc = (Player.PlayerController)_body;
         GD.Print("WARDEN CHAIN READY — Q/LMB: 3-hit sword arc (20/20/35), 120deg x 2.4m ground-projected hitbox");
     }
 
@@ -78,6 +80,7 @@ public partial class WardenChain : Node3D
 
         ShowArc(facing);
         bool heavy = index == Damage.Length - 1;
+        int dmg = Mathf.RoundToInt(Damage[index] * _pc.DamageMultiplier);   // warcry buff (Vision 7)
         int hits = 0;
         foreach (var node in GetTree().GetNodesInGroup("dummies"))
         {
@@ -91,11 +94,11 @@ public partial class WardenChain : Node3D
             float angle = Mathf.RadToDeg(facing.AngleTo(to.Normalized()));
             if (angle > ArcDegrees * 0.5f)
                 continue;
-            if (dummy.TakeDamage(Damage[index], heavy))
+            if (dummy.TakeDamage(dmg, heavy))
                 hits++;
         }
         EmitSignal(SignalName.ChainSwing, index, aim);
-        GD.Print($"WARDEN SWING {index + 1}/3 dmg={Damage[index]} hits={hits}");
+        GD.Print($"WARDEN SWING {index + 1}/3 dmg={dmg} hits={hits}");
     }
 
     /// <summary>Ground-projected arc sector flash — the visible hitbox.</summary>
@@ -119,42 +122,9 @@ public partial class WardenChain : Node3D
             AddChild(_arcFlash);
         }
 
-        _arcFlash.Mesh = BuildSectorMesh(facing);
+        _arcFlash.Mesh = GroundShapes.Sector(Reach, ArcDegrees, facing);
         _arcFlash.GlobalPosition = new Vector3(_body.GlobalPosition.X, 0.03f, _body.GlobalPosition.Z);
         _arcFlash.Visible = true;
         _flashTimer = 0.15f;
-    }
-
-    private ArrayMesh BuildSectorMesh(Vector3 facing)
-    {
-        const int segments = 14;
-        float arcRad = Mathf.DegToRad(ArcDegrees);
-        float half = arcRad * 0.5f;
-        float baseYaw = Mathf.Atan2(-facing.X, -facing.Z);     // body-style yaw
-        var st = new SurfaceTool();
-        st.Begin(Mesh.PrimitiveType.Triangles);
-        Vector3 origin = new Vector3(0, 0, 0);
-        for (int i = 0; i < segments; i++)
-        {
-            float a0 = -half + arcRad * i / segments;
-            float a1 = -half + arcRad * (i + 1) / segments;
-            // Sector in the XZ plane: angle measured around +Up from facing.
-            var p0 = PointAt(baseYaw + a0);
-            var p1 = PointAt(baseYaw + a1);
-            st.SetNormal(Vector3.Up);
-            st.AddVertex(origin);
-            st.SetNormal(Vector3.Up);
-            st.AddVertex(p0);
-            st.SetNormal(Vector3.Up);
-            st.AddVertex(p1);
-        }
-        var mesh = st.Commit();
-        return mesh;
-    }
-
-    private Vector3 PointAt(float yaw)
-    {
-        // Forward = -Z rotated by yaw around Up (Godot convention).
-        return new Vector3(-Mathf.Sin(yaw), 0f, -Mathf.Cos(yaw)) * Reach;
     }
 }

@@ -239,6 +239,7 @@ public partial class ArenaTest : Node3D
         _player = new PlayerController { Name = "Player" };
         _player.Position = new Vector3(0, 0.2f, -2);
         _player.AddChild(new WardenChain { Name = "WardenChain" });   // Vision 7 slice: Q/LMB sword chain
+        _player.AddChild(new WardenKit { Name = "WardenKit" });       // Vision 7: E bash, R warcry, F wall
         AddChild(_player);
     }
 

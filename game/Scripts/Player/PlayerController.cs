@@ -35,6 +35,13 @@ public partial class PlayerController : CharacterBody3D
     public bool IsInvulnerable => IsDodging;        // Vision 7: i-frames
     public bool IsSprinting { get; private set; }
 
+    // --- Shield wall + warcry buffs (Vision 7 Warden kit; WardenKit drives) ---
+    [Export] public float WallStaminaDrain = 25f;   // BALANCE.md: wall_drain
+    public bool IsShieldWalling { get; private set; }
+    private float _wallTimer;
+    private float _warcryTimer;
+    private float _warcryMultiplier = 1f;
+
     // --- Animation hooks (Vision 6.8): swap for a real AnimationPlayer. ---
     [Signal] public delegate void FootstepEventHandler();
     [Signal] public delegate void DodgeStartedEventHandler();
@@ -82,6 +89,7 @@ public partial class PlayerController : CharacterBody3D
         UpdateStamina(delta);
         UpdateDodgeTimers(delta);
         HandleDodgeInput();
+        UpdateBuffTimers(delta);
 
         var input = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
         var moveDir = CameraRelative(input);
@@ -98,7 +106,7 @@ public partial class PlayerController : CharacterBody3D
 
             bool wantsSprint = Input.IsActionPressed("sprint")
                                && moveDir.LengthSquared() > 0.01f;
-            IsSprinting = wantsSprint && Stamina > 1f;
+            IsSprinting = wantsSprint && Stamina > 1f && !IsShieldWalling;   // no sprint behind the shield
 
             var goal = moveDir * (IsSprinting ? SprintSpeed : WalkSpeed);
             Velocity = Velocity.Lerp(goal, 1f - Mathf.Exp(-Accel * delta));
@@ -164,10 +172,10 @@ public partial class PlayerController : CharacterBody3D
 
     private void UpdateStamina(float delta)
     {
-        bool draining = IsSprinting;
+        bool draining = IsSprinting || IsShieldWalling;
         if (draining)
         {
-            Stamina = Mathf.Max(0f, Stamina - SprintDrain * delta);
+            Stamina = Mathf.Max(0f, Stamina - (IsShieldWalling ? WallStaminaDrain : SprintDrain) * delta);
             _staminaIdleTimer = StaminaRegenDelay;
         }
         else
@@ -177,6 +185,48 @@ public partial class PlayerController : CharacterBody3D
             else
                 Stamina = Mathf.Min(StaminaMax, Stamina + StaminaRegen * delta);
         }
+    }
+
+    /// <summary>Spend stamina for an ability (Warden bash). Fails cleanly.</summary>
+    public bool TrySpendStamina(float cost)
+    {
+        if (Stamina < cost)
+            return false;
+        Stamina -= cost;
+        _staminaIdleTimer = StaminaRegenDelay;
+        return true;
+    }
+
+    /// <summary>Vision 7: shield wall = 100% block for the duration; the
+    /// stamina drain lives in UpdateStamina and ends it at empty.</summary>
+    public void StartShieldWall(float duration)
+    {
+        if (IsDodging)
+            return;
+        _wallTimer = duration;
+        IsShieldWalling = true;
+    }
+
+    /// <summary>Vision 7: warcry = timed ally buff; self-buff while solo.</summary>
+    public void StartWarcry(float duration, float multiplier)
+    {
+        _warcryTimer = duration;
+        _warcryMultiplier = multiplier;
+    }
+
+    /// <summary>Chain damage multiplier while a warcry buff is running.</summary>
+    public float DamageMultiplier => _warcryTimer > 0f ? _warcryMultiplier : 1f;
+
+    private void UpdateBuffTimers(float delta)
+    {
+        if (IsShieldWalling)
+        {
+            _wallTimer -= delta;
+            if (_wallTimer <= 0f || Stamina <= 0f)
+                IsShieldWalling = false;              // Vision 7: wall ends at 2 s or empty stamina
+        }
+        if (_warcryTimer > 0f)
+            _warcryTimer -= delta;
     }
 
     private void FaceMovement(float delta)
@@ -246,5 +296,7 @@ public partial class PlayerController : CharacterBody3D
         ["speed"] = Velocity.Length(),
         ["on_floor"] = IsOnFloor(),
         ["move_speed_cap"] = IsSprinting ? SprintSpeed : WalkSpeed,
+        ["shield_walling"] = IsShieldWalling,
+        ["damage_multiplier"] = DamageMultiplier,
     };
 }

@@ -31,6 +31,17 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 | full_chain    | 75 dmg   | kills a 100 HP dummy in 2 chains        |
 | attack_inputs | Q / LMB  | action "attack"                         |
 
+## Warden kit (Vision 7 kit slice 2; WardenKit.cs)
+| name          | value    | notes                                   |
+|---------------|----------|-----------------------------------------|
+| shield_bash   | E        | 90 deg cone x 3.2 m, 15 dmg, 0.5 s stun |
+| bash_cost     | 20       | stamina; cooldown 6 s                   |
+| warcry        | R        | +15% chain damage, radius 8 m, 10 s     |
+| warcry_cd     | 12 s     | no stamina cost                         |
+| shield_wall   | F        | 100% block 2 s (Vision 7)               |
+| wall_drain    | 25/s     | stamina; wall ends at empty or 2 s      |
+| inputs        | E / R / F| Vision 1 lists QWER but W is movement — skills bind Q / E / R / F |
+
 ## Training dummy (TrainingDummy.cs — combat verification target)
 | name         | value | notes                            |
 |--------------|-------|----------------------------------|
