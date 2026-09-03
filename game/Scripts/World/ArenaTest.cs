@@ -147,6 +147,9 @@ public partial class ArenaTest : Node3D
             ShadowEnabled = true,
             Position = new Vector3(0, 1.6f, 0),
         });
+        var embers = AtmosphereParticles.Embers();       // Vision 6.2/6.7
+        embers.Position = new Vector3(0, 1.45f, 0);
+        brazier.AddChild(embers);
         brazier.Position = new Vector3(x, 0, z);
         AddChild(brazier);
     }
@@ -249,5 +252,9 @@ public partial class ArenaTest : Node3D
         AddChild(new Reticle { Name = "Reticle" });
         AddChild(new OcclusionFader { Name = "OcclusionFader", TargetPath = _player.GetPath() });
         AddChild(new UI.ArenaHud { Name = "ArenaHud", PlayerPath = _player.GetPath() });   // Vision 6.10
+
+        var rain = AtmosphereParticles.Rain(new Vector2(38, 38));   // Vision 6.2: rain outdoors
+        rain.Position = new Vector3(0, 14f, 0);
+        AddChild(rain);
     }
 }
