@@ -169,8 +169,15 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Server browser UI: list from central, password prompt, direct IP join; enable the disabled "Server Browser" button on CharacterSelect. NOTE: remote playtesting of the login/character UI is DONE (session 2: screenshots + keyboard flow verified, console clean; keysmith/secret123 re-registered on remote central after the sqlite file was untracked).
-2. Dedicated server mode: --server flags, heartbeat to central, headless boot test green.
+1. Dedicated server mode: --server flags, heartbeat to central, headless boot test green.
+   NOTE (session 3): server browser UI is DONE and playtested (list from central with
+   empty-state, PW badge + password dialog, direct IP join verified END-TO-END against a
+   real ENet listener on :7799 — server logged PEER_CONNECTED; Back/Refresh/mode filter
+   work; zero console errors). The chosen password is captured in the UI but only travels
+   with the realm handshake once the dedicated server exists — wire it then. Test listener
+   script pattern: SceneTree._process + get_multiplayer() (bare `multiplayer` does not
+   parse in -s scripts; pkill -f patterns must use [b]racket trick or they kill the ssh
+   shell).
 3. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal, zoom,
    smooth follow + cursor ground-aim (Aim) + reticle decal + occlusion fade shader.
    Screenshot: camera behind wall must NOT hide the player.
