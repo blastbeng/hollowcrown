@@ -97,11 +97,37 @@ headless dedicated server smoke test:
 compile check (remote or local):
   dotnet build Hollowcrown.sln
 
-## 4b. MCP TOOL MAP (fill in after first session — use EXACT names)
-- playtester: run/stop: <names> | screenshot: <name> | logs: <name> | input: <name>
-- godot store: search: <name> | install: <name>
-- blender: probe: <name> | export: <name>
-- web search / playwright / github search: <names>
+## 4b. MCP TOOL MAP (verified live in session 1 — use EXACT names)
+- playtester (remote 192.168.1.29:6550; local mirror = same names with
+  godot-playtester-mcp-local prefix): run/stop/restart/rescan:
+  godot_editor_edit (action=run, frozen=true | stop | restart | rescan) |
+  screenshot: godot_editor_read (action=screenshot_game / screenshot_editor) |
+  logs/errors: godot_editor_read (action=get_log_messages / get_stack_trace) |
+  input: godot_input (action=sequence / type_text / get_map) |
+  state: godot_runtime_state (digest / watch_start / watch_collect) |
+  time control: godot_game_time (freeze / step / step_until / thaw) |
+  exec GDScript: godot_exec (action=run) | scene/nodes: godot_scene,
+  godot_node_read, godot_node_edit | project: godot_project (get_info /
+  get_settings) | 3D: godot_scene3d | resources: godot_resource |
+  animations: godot_animation_read/edit | tilemap/gridmap: godot_tilemap_read,
+  godot_tilemap_edit, godot_gridmap_read, godot_gridmap_edit |
+  profile: godot_profiler | mesh check: godot_validate_meshes |
+  docs: godot_docs (fetch_class / fetch_page)
+- godot store (old library): search: godot-store-mcp---library_search
+  (categories via godot-store-mcp---library_configure, details via
+  godot-store-mcp---library_get_asset) | install:
+  godot-store-mcp---library_download_asset (downloads zip locally).
+  New store: search godot-store-mcp---store_search, details
+  godot-store-mcp---store_get_asset, download godot-store-mcp---store_download_asset.
+- blender: NOT configured (no blender MCP in mcp-servers.json) -> fallback to
+  store assets / primitives per project_vision.md Section 5, note it in commits.
+- web search: gateway---searxng_web_search | page read: gateway---web_url_read,
+  power---fetch | playwright: playwright---browser_navigate, browser_snapshot,
+  browser_take_screenshot | github search: gateway---search_code,
+  gateway---search_repositories, gateway---search_issues,
+  gateway---search_pull_requests, gateway---search_commits
+  (NOTE session 1: gateway GitHub auth kept rotating device codes — if
+  unavailable, use local git + web search until it is fixed).
 
 ## 5. SESSION FLOW
 1. Read project_vision.md + this file + NEXT TASKS.
