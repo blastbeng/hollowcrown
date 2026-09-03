@@ -118,6 +118,18 @@ compile check (remote or local):
   godot_tilemap_edit, godot_gridmap_read, godot_gridmap_edit |
   profile: godot_profiler | mesh check: godot_validate_meshes |
   docs: godot_docs (fetch_class / fetch_page)
+- playtester INPUT CAVEATS (session 2): type_text is the ONLY way to fill
+  LineEdits (raw per-key injection sends no unicode: nothing is typed, but
+  Enter keys still fire focus-walk/submit). After a screen swap the new
+  screen must GrabFocus, or type_text goes into the void. After pushing
+  commits you MUST run tools/remote_test.sh (it pulls); stop+run alone
+  rebuilds only what is already on the remote disk. If the bridge says
+  "closed client" while godot listens on 6550: sudo systemctl restart
+  aiderdesk (restarts this agent too; check uptime, then just retry).
+- Godot C# LAYOUT CAVEAT (session 2): SetAnchorsPreset(FullRect) preserves
+  the control's current size (offsets become negative) — a fresh Control
+  stays 0x0. Use SetAnchorsAndOffsetsPreset. C# lambda trap: naming a
+  lambda parameter "_" makes `_ = Task` assign to the parameter, not discard.
 - godot store (old library): search: godot-store-mcp---library_search
   (categories via godot-store-mcp---library_configure, details via
   godot-store-mcp---library_get_asset) | install:
@@ -157,32 +169,24 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Remote playtest of the new login/character UI (task 3 code is committed, built
-   and headless-verified): reconnect the godot-playtester MCPs in the client first
-   (bridge said "closed client" after the 13:44 MCP reconfig; if the bridge slot is
-   held, kill orphaned godot-mcp node processes older than the current session, then
-   remote_test.sh --restart). Evidence needed: login screen shot, character screen
-   shot, keyboard login flow (Enter: user -> password -> submit; account
-   "keysmith" / "secret123" exists on the remote central), console clean.
-2. Server browser UI: list from central, password prompt, direct IP join; enable
-   the disabled "Server Browser" button on CharacterSelect.
-3. Dedicated server mode: --server flags, heartbeat to central, headless boot test green.
-4. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal, zoom,
+1. Server browser UI: list from central, password prompt, direct IP join; enable the disabled "Server Browser" button on CharacterSelect. NOTE: remote playtesting of the login/character UI is DONE (session 2: screenshots + keyboard flow verified, console clean; keysmith/secret123 re-registered on remote central after the sqlite file was untracked).
+2. Dedicated server mode: --server flags, heartbeat to central, headless boot test green.
+3. Isometric camera rig (Vision 6.1): locked yaw 45 / pitch -50, orthogonal, zoom,
    smooth follow + cursor ground-aim (Aim) + reticle decal + occlusion fade shader.
    Screenshot: camera behind wall must NOT hide the player.
-5. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment (Vision 6.2).
-6. Player controller: WASD camera-relative movement, sprint, dodge roll,
+4. Duel arena v1: seeded procedural arena (Vision 6.6) + WorldEnvironment (Vision 6.2).
+5. Player controller: WASD camera-relative movement, sprint, dodge roll,
    footstep/roll animation hooks.
-7. Combat core: ground-projected hitboxes, telegraph decals, damage numbers,
+6. Combat core: ground-projected hitboxes, telegraph decals, damage numbers,
    death/respawn, killfeed; Warden kit complete (chain, bash, warcry, wall).
-8. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
-9. Balance harness v1: bot mirror matches, winrate matrix printed.
-10. XP/leveling + progression sync to central + results screen.
-11. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-12. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
-13. Skirmish mode (3v3) + team spawns/score.
-14. Open world zone: village chunks, shrines, roaming elites, minimap.
-15. Matchmaking quick-play flow via central.
-16. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
-17. Windows + Linux export presets + dedicated server headless export.
-18. Robustness: disconnects, rejoin, XP/MMR validation caps.
+7. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
+8. Balance harness v1: bot mirror matches, winrate matrix printed.
+9. XP/leveling + progression sync to central + results screen.
+10. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+11. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
+12. Skirmish mode (3v3) + team spawns/score.
+13. Open world zone: village chunks, shrines, roaming elites, minimap.
+14. Matchmaking quick-play flow via central.
+15. Atmosphere pass 2: rain, embers, banner sway, ambience audio.
+16. Windows + Linux export presets + dedicated server headless export.
+17. Robustness: disconnects, rejoin, XP/MMR validation caps.
