@@ -55,7 +55,7 @@ public partial class PlayerController : CharacterBody3D
         _capsule = new MeshInstance3D
         {
             Mesh = new CapsuleMesh { Radius = 0.35f, Height = 1.8f },
-            MaterialOverride = MaterialFactory.PlayerSteel(),
+            MaterialOverride = MaterialFactory.PlayerAccent(),  // bone accent: silhouette reads vs floor (Vision 6.8)
             Position = new Vector3(0f, 0.9f, 0f),
         };
         _visualRoot.AddChild(_capsule);
