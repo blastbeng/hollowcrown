@@ -169,28 +169,61 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Combat server authority (Vision 2.3): move damage computation to the match
-   server (ENet RPCs, server-side hit validation), player HP/death/respawn,
-   killfeed. Warden kit + dummy client-side slice DONE and verified (below).
-2. Realm handshake after ENet connect (password check + spawn flow) — join
-   currently connects but spawns nothing (session 3 note).
-3. Rigged class models: store humanoid with FACE + per-class silhouette
+1. Realm handshake after ENet connect (Vision 4): password check + spawn flow
+   + peer names — join now loads the arena (RealmJoined -> Main.EnterRealm)
+   but there are no networked PLAYERS yet. Fold in: spawn both peers' wardens,
+   player HP/death/respawn through CombatAuthority (ICombatTarget), enemy
+   nameplates red (6.8), position sync, PvP hit flow (client requests vs
+   remote player). (Session 3 note resolved: arena now loads on connect.)
+2. Rigged class models: store humanoid with FACE + per-class silhouette
    (Warden broad + shield), retint, weapon sockets, run/attack/roll/death
    anims (Vision 6.8 — capsule stand-in is temporary).
-4. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
-5. Arena polish remainder: gothic arches (store assets or Blender), rubble
+3. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
+4. Arena polish remainder: gothic arches (store assets or Blender), rubble
    stones scale up ~2x, banner sway, chains/cobwebs (6.7), ember mote tuning
    (currently reads as glow — want distinct rising sparks).
-6. Balance harness v1: bot mirror matches, winrate matrix printed.
-7. XP/leveling + progression sync to central + results screen.
-8. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-9. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
-10. Skirmish mode (3v3) + team spawns/score.
-11. Open world zone: village chunks, shrines, roaming elites, minimap.
-12. Matchmaking quick-play flow via central.
-13. Atmosphere pass 2: ambience audio, fog drift, fireflies.
-14. Windows + Linux export presets + dedicated server headless export.
-15. Robustness: disconnects, rejoin, XP/MMR validation caps.
+5. Balance harness v1: bot mirror matches, winrate matrix printed.
+6. XP/leveling + progression sync to central + results screen.
+7. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+8. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
+9. Skirmish mode (3v3) + team spawns/score.
+10. Open world zone: village chunks, shrines, roaming elites, minimap.
+11. Matchmaking quick-play flow via central.
+12. Atmosphere pass 2: ambience audio, fog drift, fireflies.
+13. Windows + Linux export presets + dedicated server headless export.
+14. Robustness: disconnects, rejoin, XP/MMR validation caps.
+
+SESSION 6 NOTE (2026-09-04) — COMBAT SERVER AUTHORITY DONE and verified
+end-to-end (Vision 2.3). New: CombatAuthority (/root/Main/CombatAuthority on
+BOTH peers, force_readable_name) owns every HP number: ENet RPCs SubmitHit/
+SubmitBuff (AnyPeer client->server) + ApplyHit/TargetStunned/TargetRespawned/
+KillFeed (Authority broadcast, CallLocal=true); server validates range/arc/
+per-peer cooldown against ITS own world; CombatTables.cs is the single
+server-owned number source (chain 20/20/35, bash 15+0.5s stun, buff cap 1.25,
+10s); TrainingDummy is a pure ICombatTarget mirror (fall/respawn server-
+driven); dedicated server + client both host the arena; ServerBrowser.RealmJoined
+-> Main.EnterRealm loads it on connect. EVIDENCE: offline validation matrix
+(valid 100->80; range/arc/cooldown/unknown-id all REJECTed, hp untouched);
+input path R->Q->E = exactly 23+17 server dmg (buff capped/expired server-side:
+later hits 20/15); offline kill -> killfeed -> respawn at 3s; MULTIPLAYER smoke:
+headless --server 7799 + client (id 313781323) fights over ENet — server log
+trail hp 80->60->25->5->0 + respawn, client mirror matches, cooldown AND
+range (30.00 > 2.75) cheats rejected server-side, killfeed "Warden#<id> slew
+the Training Dummy" on screen, screenshot evidence vs Section 6 (target frame
+live server HP, bash cone + stun ring flat on floor, damage numbers, cooldown
+sweeps, stamina costs). Commit 4d98e99.
+GOTCHAS (session 6): (13) exec GDScript vs C#: NATIVE props snake_case
+(name, visible, current_scene); C#-declared PRIVATE fields are unreachable —
+read via public getters or walk the tree for Label.text; if/for need colons.
+(14) An identical repeated exec call is blocked by a dedupe guard, but an
+earlier "duplicate" may still have executed — always re-read state instead of
+assuming (a phantom extra hit proved this). (15) OfflineMultiplayerPeer is
+ALWAYS set -> HasMultiplayerPeer() is true offline; gate networked on
+`MultiplayerPeer is not OfflineMultiplayerPeer` (CombatAuthority.Networked).
+Time.GetTicksMsec runs on WALL CLOCK even frozen — respawn/cooldown timers
+elapse between tool calls (server respawn beats screenshots; reads may show
+post-respawn 100/100). (16) `ss -tln` is TCP-only — ENet is UDP (`ss -uln`);
+verify the dedicated server via its log lines, not port probes.
 
 SESSION 5 NOTE (2026-09-03) — Warden kit COMPLETE and verified end-to-end
 (vision 7): shield bash E (90deg x 3.2m cone flash, 15 dmg, 0.5s stun with

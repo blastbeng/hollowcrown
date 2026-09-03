@@ -36,7 +36,11 @@ public partial class CombatAuthority : Node
     private readonly Dictionary<int, double> _respawnAt = new();
     private int _nextId = 1;
 
-    public bool Networked => Multiplayer.HasMultiplayerPeer();
+    /// <summary>True only with a REAL peer — the default OfflineMultiplayerPeer
+    /// (always set, always id 1, server mode) counts as offline single-player.
+    /// Offline, broadcast senders invoke the RPC bodies directly.</summary>
+    public bool Networked => Multiplayer.HasMultiplayerPeer() &&
+        Multiplayer.MultiplayerPeer is not OfflineMultiplayerPeer;
     public bool IsAuthorityMode => !Networked || Multiplayer.IsServer();
 
     public static CombatAuthority? For(Node node) =>
