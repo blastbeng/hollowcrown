@@ -20,14 +20,14 @@ public partial class CharacterSelect : Control
     public override void _Ready()
     {
         Theme = UiTheme.Build();
-        SetAnchorsPreset(LayoutPreset.FullRect);
+        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 
         var background = new ColorRect { Color = UiTheme.Background };
-        background.SetAnchorsPreset(LayoutPreset.FullRect);
+        background.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(background);
 
         var margin = new MarginContainer();
-        margin.SetAnchorsPreset(LayoutPreset.FullRect);
+        margin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         margin.AddThemeConstantOverride("margin_left", 60);
         margin.AddThemeConstantOverride("margin_right", 60);
         margin.AddThemeConstantOverride("margin_top", 30);

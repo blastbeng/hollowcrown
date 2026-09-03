@@ -25,14 +25,14 @@ public partial class LoginScreen : Control
     public override void _Ready()
     {
         Theme = UiTheme.Build();
-        SetAnchorsPreset(LayoutPreset.FullRect);
+        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 
         var background = new ColorRect { Color = UiTheme.Background };
-        background.SetAnchorsPreset(LayoutPreset.FullRect);
+        background.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(background);
 
         var center = new CenterContainer();
-        center.SetAnchorsPreset(LayoutPreset.FullRect);
+        center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(center);
 
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(420, 0) };
