@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hollowcrown", "game\Hollowcrown.csproj", "{69D8805A-B15E-4370-A464-E169860538B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "central", "central\central.csproj", "{27A0EDCE-FA92-494D-87CB-E5D8D0B71F92}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "shared", "shared\shared.csproj", "{90950AED-AAF1-4BDF-8BDA-BC365C0DBF17}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{69D8805A-B15E-4370-A464-E169860538B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69D8805A-B15E-4370-A464-E169860538B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69D8805A-B15E-4370-A464-E169860538B4}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{69D8805A-B15E-4370-A464-E169860538B4}.Release|Any CPU.Build.0 = Debug|Any CPU
+		{27A0EDCE-FA92-494D-87CB-E5D8D0B71F92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27A0EDCE-FA92-494D-87CB-E5D8D0B71F92}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27A0EDCE-FA92-494D-87CB-E5D8D0B71F92}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27A0EDCE-FA92-494D-87CB-E5D8D0B71F92}.Release|Any CPU.Build.0 = Release|Any CPU
+		{90950AED-AAF1-4BDF-8BDA-BC365C0DBF17}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90950AED-AAF1-4BDF-8BDA-BC365C0DBF17}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90950AED-AAF1-4BDF-8BDA-BC365C0DBF17}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90950AED-AAF1-4BDF-8BDA-BC365C0DBF17}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

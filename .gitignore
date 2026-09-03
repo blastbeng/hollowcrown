@@ -1,1 +1,9 @@
+# Build output / Godot cache — dirty build output is the main cause of remote pull failures
+.godot/
+bin/
+obj/
+*.user
+*.tmp
+
+# Local assistant state
 .aider*

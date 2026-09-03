@@ -115,6 +115,9 @@ HOLLOWCROWN — dark fantasy ISOMETRIC PvP MMO. Godot 4.x + C#/.NET.
   against sane caps; deeper hardening is a LATER task, not now.
 
 ## 5. MCP TOOL POLICY
+Paths: local repo /opt/projects/hollowcrown; remote mirror /opt/projects/hollowcrown on
+Ubuntu PC 192.168.1.29 (git-synced: local push -> remote pull; local dotnet /opt/dotnet/dotnet,
+local godot /opt/godot/bin/godot).
 - godot-playtester (remote Godot at 192.168.1.29:6550): PRIMARY test loop.
   Always via `bash tools/remote_test.sh` first (it syncs git and launches the
   editor). If the host is offline, skip it and use local fallbacks.

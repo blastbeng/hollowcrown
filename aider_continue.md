@@ -6,9 +6,17 @@
   controls). Language: C# on Godot 4 (.NET), plus a C# ASP.NET central
   server. GDScript is forbidden. Hollowcrown.sln at repo root:
   game/ (Godot) + central/ (central server) + shared/ (DTOs).
-- Local repo = current working dir. Remote mirror = /opt/projects/Hollowcrown
+- Local repo = /opt/projects/hollowcrown. Remote mirror = /opt/projects/hollowcrown
   on Ubuntu PC 192.168.1.29 (synced via git: local push -> remote pull).
 - The remote PC is NOT always online. Detect first, never assume.
+- SSH KEY LOGIN IS THE ONLY ACCESS METHOD. If ssh answers "Permission denied
+  (publickey)", the PC is up but booted into another distro/OS that does not
+  accept our keys: treat it as HOST_OFFLINE (offline fallback), retry next
+  iteration. NEVER ask the user to change or re-add ssh keys — just continue
+  locally and use the remote only when the key login is accepted again.
+- If the Godot editor is closed on the remote host, open it over SSH
+  (remote_test.sh launches it automatically; manual command in Section 4).
+  Check port 6550 first — never assume the editor is running.
 - When unsure, prefer the action that produces testable evidence.
 
 ## 1. REMOTE TEST ENVIRONMENT (primary)
@@ -19,7 +27,7 @@
 - The Godot store MCP and Blender MCP run in the local workspace (see
   project_vision.md Section 5 for when to use each).
 - SSH: ssh -i ~/.ssh/id_ed25519 blast@192.168.1.29 (Wayland desktop).
-- Repo: /opt/projects/Hollowcrown. Godot binary: /usr/local/bin/godot (must
+- Repo: /opt/projects/hollowcrown. Godot binary: /usr/local/bin/godot (must
   be the .NET build — verify once: version string contains "mono" or ".net").
   dotnet SDK 8+ required on BOTH machines.
 - ONE command does everything: bash tools/remote_test.sh
