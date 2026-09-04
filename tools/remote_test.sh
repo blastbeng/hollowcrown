@@ -76,6 +76,7 @@ if ! port_up 6550; then
           export WAYLAND_DISPLAY=\${WD:-wayland-0}; \
           export DOTNET_ROOT=/usr/lib/dotnet; \
           export PATH=\"\$PATH:/usr/lib/dotnet:/opt/dotnet\"; \
+          export HC_CLASS='$HC_CLASS'; \
           nohup /usr/local/bin/godot --editor --path $GAME_DIR >$GODOT_LOG 2>&1 </dev/null &" >/dev/null 2>&1
   UP=0
   for _ in $(seq 1 12); do sleep 2; port_up 6550 && { UP=1; break; }; done

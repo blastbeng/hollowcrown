@@ -25,6 +25,16 @@ public partial class Main : Node3D
 
     public override void _Ready()
     {
+        // Class selection for automated/editor runs: HC_CLASS env (set by
+        // remote_test.sh) overrides the warden default when no --class flag
+        // was passed. The UI flow picks the class via the character card.
+        if (PlayerController.PendingClass == PlayerClass.Warden)
+        {
+            string envClass = OS.GetEnvironment("HC_CLASS");
+            if (envClass.Length > 0)
+                PlayerController.PendingClass = PlayerClassInfo.FromId(envClass);
+        }
+
         string joinHost = "";
         int joinPort = 0;
         string joinPassword = "";
