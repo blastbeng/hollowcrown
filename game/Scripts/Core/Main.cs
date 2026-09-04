@@ -133,7 +133,10 @@ public partial class Main : Node3D
         AddCombatAuthority();
         if (GetNodeOrNull<Node3D>("Arena") is null)
             AddChild(new ArenaTest { Name = "Arena" }, forceReadableName: true);
-        _ui.Visible = false;
+        // The --join launch path calls JoinRealm from _Ready before any menu
+        // UI exists — only hide the menus when they were built.
+        if (_ui is not null)
+            _ui.Visible = false;
         GD.Print("REALM ENTERED — arena live, combat authority attached");
     }
 
