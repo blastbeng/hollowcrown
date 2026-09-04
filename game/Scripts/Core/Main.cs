@@ -109,6 +109,11 @@ public partial class Main : Node3D
     /// Also the entry point for automated multiplayer smoke tests.</summary>
     public void JoinRealm(string host, int port, string password)
     {
+        // Attach the authority BEFORE dialing: ConnectedToServer (which sends
+        // the password handshake) must have a subscriber when the ENet connect
+        // completes — with the peer set first, the event fired into the void
+        // and the server held the join unapproved forever (found live 2026-09-04).
+        EnterRealm();
         CombatAuthority.PendingPassword = password;
         var peer = new ENetMultiplayerPeer();
         if (peer.CreateClient(host, port) != Error.Ok)
@@ -118,7 +123,6 @@ public partial class Main : Node3D
         }
         Multiplayer.MultiplayerPeer = peer;
         GD.Print($"HOLLOWCROWN BOOT OK — joining realm at {host}:{port}");
-        EnterRealm();
     }
 
     /// <summary>Enter the realm: hide the menu UI and build the arena under

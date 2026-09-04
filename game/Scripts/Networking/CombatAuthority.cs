@@ -113,6 +113,11 @@ public partial class CombatAuthority : Node
         Multiplayer.PeerDisconnected += OnPeerDisconnected;
         Multiplayer.ConnectedToServer += SendHandshake;
         Multiplayer.ServerDisconnected += OnServerGone;
+        // Belt and braces: if we attached after the ENet connect already
+        // completed (JoinRealm path), the ConnectedToServer event is gone —
+        // present the handshake now (idempotent: the server ignores replays).
+        if (Networked && !IsAuthorityMode)
+            SendHandshake();
         GD.Print($"COMBAT AUTHORITY READY — networked={Networked} authority={IsAuthorityMode}");
     }
 
