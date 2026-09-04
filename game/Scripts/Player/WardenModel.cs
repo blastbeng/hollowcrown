@@ -43,7 +43,7 @@ public partial class WardenModel : Node3D
 
     private AnimationPlayer? _anim;
     private ShaderMaterial? _bodyMaterial;
-    private readonly List<StandardMaterial3D> _fadeMaterials = new();
+    private readonly List<Material> _fadeMaterials = new();
     private string? _oneshot;
     private string _locomotionClip = ClipIdle;
     private bool _dead;
@@ -123,22 +123,21 @@ public partial class WardenModel : Node3D
         _ => "sword + shield",
     };
 
-    /// <summary>Steel-plate retint: overrides keep the source albedo/normal/
-    /// roughness textures and tint toward the Vision 6.11 palette. All three
-    /// overrides register for the death fade (alpha lerp).</summary>
+    /// <summary>Class-aware retint: each mesh gets exactly ONE override —
+    /// the body the luminance shader, eyes/eyebrows tinted standard mats. All
+    /// overrides register for the death fade / stealth ghost (alpha).</summary>
     private void Retint(Skeleton3D skeleton)
     {
         foreach (var mesh in skeleton.GetChildren())
         {
             if (mesh is not MeshInstance3D mi)
                 continue;
-            var mat = new StandardMaterial3D
-            {
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,   // death fade channel
-            };
+
+            Material mat;
             switch (mi.Name)
             {
                 case "SuperHero_Male":
+                {
                     // Grayscale-luminance shader: the suit texture is warm
                     // tan; only an absolute tint (not a multiply) reads as
                     // the intended material (Vision 6.11).
@@ -151,17 +150,32 @@ public partial class WardenModel : Node3D
                     _bodyMaterial.SetShaderParameter("tint", ClassBodyTint());
                     _bodyMaterial.SetShaderParameter("roughness_v", 0.62f);
                     _bodyMaterial.SetShaderParameter("metallic_v", 0.45f);
-                    mi.MaterialOverride = _bodyMaterial;
+                    mat = _bodyMaterial;
                     break;
+                }
                 case "Eyes":
-                    mat.AlbedoTexture = GD.Load<Texture2D>("res://Godot - UE/T_Eye_Brown.png");
-                    mat.AlbedoColor = new Color(Colors.White, 1f);
-                    mat.Roughness = 0.4f;
+                    mat = new StandardMaterial3D
+                    {
+                        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                        AlbedoTexture = GD.Load<Texture2D>("res://Godot - UE/T_Eye_Brown.png"),
+                        AlbedoColor = new Color(Colors.White, 1f),
+                        Roughness = 0.4f,
+                    };
                     break;
                 case "Eyebrows":
-                    mat.AlbedoTexture = GD.Load<Texture2D>("res://Godot - UE/T_Hair_1_BaseColor.png");
-                    mat.AlbedoColor = new Color(TrimTint, 1f);
-                    mat.Roughness = 0.9f;
+                    mat = new StandardMaterial3D
+                    {
+                        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                        AlbedoTexture = GD.Load<Texture2D>("res://Godot - UE/T_Hair_1_BaseColor.png"),
+                        AlbedoColor = new Color(TrimTint, 1f),
+                        Roughness = 0.9f,
+                    };
+                    break;
+                default:
+                    mat = new StandardMaterial3D
+                    {
+                        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                    };
                     break;
             }
             mi.MaterialOverride = mat;
@@ -423,17 +437,26 @@ public partial class WardenModel : Node3D
         StartOneShot(ClipHit);
     }
 
+    /// <summary>Fade helper: shader bodies take alpha_v, standard mats take
+    /// the AlbedoColor alpha channel (death fade + stealth ghost).</summary>
+    private void SetFadeAlpha(float a)
+    {
+        foreach (var mat in _fadeMaterials)
+        {
+            if (mat is ShaderMaterial sm)
+                sm.SetShaderParameter("alpha_v", a);
+            else if (mat is StandardMaterial3D std)
+                std.AlbedoColor = new Color(std.AlbedoColor, a);
+        }
+    }
+
     /// <summary>Stealth ghost (Vision 7 nightblade): body fades to a dark
     /// shimmer while stealthed; the death fade folds it back in.</summary>
     public void SetGhost(float alpha)
     {
         _ghostAlpha = Mathf.Clamp(alpha, 0.05f, 1f);
         if (!_dead)
-        {
-            _bodyMaterial?.SetShaderParameter("alpha_v", _ghostAlpha);
-            foreach (var mat in _fadeMaterials)
-                mat.AlbedoColor = new Color(mat.AlbedoColor, _ghostAlpha);
-        }
+            SetFadeAlpha(_ghostAlpha);
     }
 
     /// <summary>Death01 one-shot; the pose freezes and the body fades.</summary>
@@ -450,8 +473,7 @@ public partial class WardenModel : Node3D
         }
         float a = Mathf.Clamp(1f - fadeAlpha, 0.15f, 1f) * _ghostAlpha;
         _bodyMaterial?.SetShaderParameter("alpha_v", a);
-        foreach (var mat in _fadeMaterials)
-            mat.AlbedoColor = new Color(mat.AlbedoColor, a);
+        SetFadeAlpha(a);
     }
 
     /// <summary>Respawn: reset pose, opacity and state to idle.</summary>
@@ -462,8 +484,7 @@ public partial class WardenModel : Node3D
         _locomotionClip = ClipIdle;
         _ghostAlpha = 1f;
         _bodyMaterial?.SetShaderParameter("alpha_v", 1f);
-        foreach (var mat in _fadeMaterials)
-            mat.AlbedoColor = new Color(mat.AlbedoColor, 1f);
+        SetFadeAlpha(1f);
         _anim?.Play(ClipIdle);
     }
 
