@@ -169,17 +169,23 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Nightblade + Revenant kits (data-driven, BALANCE.md entries) — reuse the
-   WardenModel pipeline: per-class variant (slim + two daggers / hooded +
-   staff) via an EnemyTint-style export + weapon-socket swap. Model pipeline
-   PROVEN (session 9): store asset -> retint shader -> bone sockets -> clips.
+1. Revenant kit slice 2 (Vision 7): life drain (R — channel line, ticks
+   damage along the strip, heals the caster ~50%; needs server heal path
+   ApplyHealRpc + channel tick RPCs) + soul ward (F — absorb shield pool:
+   server-owned per-peer ward dict, subtract before HP in ValidateAndApply,
+   broadcast WardStateRpc for the VFX disc). Model variant, line hitbox,
+   root state + ICombatTarget.OnRooted all DONE in session 10.
 2. Arena polish remainder: gothic arches (store assets or Blender), banner
    sway, chains/cobwebs (6.7), ember mote tuning (currently reads as glow —
    want distinct rising sparks). (Rubble ~2x DONE, verified on screen.)
 3. Balance harness v1: bot mirror matches, winrate matrix printed.
-4. XP/leveling + progression sync to central + results screen.
+4. XP/leveling + progression sync to central + results screen; while there:
+   character-select card click should set PlayerController.PendingClass +
+   CombatAuthority.PendingClass (classes are boot-flag only right now).
 5. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-6. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
+6. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
+   Vision 4 wants match-server tokens for /servers/heartbeat + PUT progress
+   — land them here).
 7. Skirmish mode (3v3) + team spawns/score.
 8. Open world zone: village chunks, shrines, roaming elites, minimap.
 9. Matchmaking quick-play flow via central.
@@ -188,9 +194,81 @@ compile check (remote or local):
 12. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
     session 9 also saw a client ENet peer go INACTIVE while Networked==true,
     spewing "multiplayer instance isn't currently active" each frame: detect
-    and recover), position-report trust checks (anti-cheat), nameplate HP
+    and recover), position-report trust checks (anti-cheat: shadow step is
+    client-simulated movement, position reports unvalidated), nameplate HP
     bars over REMOTE avatars, attack-cast relay (puppets can't show remote
-    swings yet — only locomotion/hit/death).
+    swings/casts yet — only locomotion/hit/death), root/stealth visuals on
+    remote puppets (root is server-applied but only the LOCAL body locks;
+    RemoteAvatar.OnRooted is a no-op stub).
+
+SESSION 10 NOTE (2026-09-04) — NIGHTBLADE + REVENANT SLICE 1 DONE, all
+verified end-to-end (Vision 7 + 6.8). BOTH classes playable end-to-end with
+the rigged model pipeline: ClassVariant export on WardenModel (tint + weapon
+sockets + attack clips per class; nightblade = twin 0.35m daggers + dark
+leather tint at BodyScale 1.12 = exactly the 1.8m spec; revenant = staff +
+gem + hood cowl, dark robe arcane cast). NIGHTBLADE: fast 14/14/28 stab
+chain (Punch clips, 100deg x 2.0m), shadow step (E — 6m blink toward cursor,
+raycast shortens at world geometry but BLINKS THROUGH combat bodies),
+stealth (R — 5s server-owned ghost, breaks on attack, next hit x1.50
+server-computed), smoke bomb (F — 3.5m/6s blind zone thrown to cursor: hits
+out of/through the cloud REJECTED server-side, victims' clients get a
+screen-dark blind overlay). REVENANT slice 1: bone spear (Q — 18 dmg,
+9m x 1.2m ground LINE hitbox, server validates lateral offset, bone bolt
+visual travels the line), grave grasp (E — 4.5m cursor circle, 6 dmg,
+1s server-applied ROOT: rooted bodies cannot move/dodge but CAN still
+fight, expires on the timer). ICombatTarget grew OnStealthed/OnRooted;
+Attack record grew Shape(Arc/Line)/Width/RootSeconds (CombatTables = the
+single number source, BALANCE.md updated per class). HUD ability bar is now
+CLASS-AGNOSTIC: each chain/kit implements IAbilityProvider, ArenaHud walks
+the player's children (Nightblade: Q Daggers/E Step/R Stealth/F Smoke;
+Revenant: Q Spear/E Grasp). Class flows through the realm handshake
+(PendingClass + HandshakeRpc 2-arg + SpawnPlayerRpc 4-arg): server names
+peers Nightblade#/Revenant#, enemy puppets render the right variant, smoke
+zones broadcast identically to every peer (SmokeZone node in group
+"smoke_zone", self-expiring).
+EVIDENCE (all server-authoritative lines from the realm log): nightblade
+chain 100->86->72 exact (attack=5 dmg=14, attack=6 dmg=14), stealth grant
+then breaking hit dmg=42 hp=30 mult=1.50 (attack=7); blind: "AUTHORITY
+REJECT ... attacker smoke-blind" (zone at the caster) AND "victim
+smoke-blind" (input-driven stab through the cloud); shadow step "STEP 6,0m
+toward cursor"; revenant spear in-line 100->82 exact (attack=8 dmg=18) +
+"AUTHORITY REJECT ... outside line (lateral 3,00 > 0,95)"; grave grasp
+82->76 (attack=9 dmg=6) + root: held move_forward 1s while rooted = ZERO
+displacement, rooted spear still applied 18 dmg, root expires on the timer
+(rooted=false after 3s); multiplayer smoke headless --server + client:
+"approved (nightblade/revenant)", "spawned Nightblade#/Revenant#<peer>",
+zero errors/screenshots judged vs Section 6 (dark leather twin-dagger
+silhouette, hooded staff silhouette, smoke cloud + ground disc + blind
+overlay all read at iso zoom).
+COMMITS c31a65a..HEAD. FIXES found by testing: (a) retint override was
+silently overwritten by the plain fallback after the switch — the body had
+ALWAYS rendered default-white (the steel shader was dead code); per-mesh
+single assignment now (warden plate + nightblade leather + revenant robe
+all verified on screen). (b) shadow-step ray hit combat bodies (dummy
+blocked the blink at 0.8m) — combat bodies excluded, world geometry still
+stops the blink. (c) --class never reached the handshake
+(CombatAuthority.PendingClass static was unwired) + PeerInfo.ClassId kept
+its default when the connect event won the race — server named nightblade
+peers Warden; both fixed, smoke-tested. (d) Godot 4.7 Variant.As<T> THROWS
+on mismatch: the occlusion ray ended inside the player's own collider and
+spammed InvalidCastException every frame — exclude the followed body's RID
++ pattern-match collider.Obj. (e) root movement gate was lost in a failed
+edit batch (player walked while "rooted") — re-applied and re-verified.
+GOTCHAS (session 10): (27) C# statics are NOT accessible from GDScript
+(load().PendingClass fails) — class selection for playtester runs goes
+through HC_CLASS env: remote_test.sh exports it before launching the
+editor, the game inherits it (Main reads it as the --class fallback).
+(28) kit cooldowns tick in GAME time: frozen tool-call latency does NOT
+consume them but wall-clock zone/stealth/respawn timers DO (Time.GetTicksMsec
+runs during freezes — an expiring smoke zone will be gone between two exec
+calls; compress throw+probe into one godot_game_time step). (29) C# method
+names stay PascalCase in exec GDScript (zone.Contains, not contains);
+C# static fields are invisible to GDScript property access. (30) The
+bridge is single-client: duplicate godot-mcp node processes (stale npx
+children) hold the slot — kill the stale pid holding the ESTAB 6550
+connection, or restart the editor. (31) The playtester runs the game
+WITHOUT user args — HC_CLASS is the only clean way to pick the class for
+MCP-driven runs. NEXT: revenant slice 2 (drain + ward).
 
 SESSION 9 NOTE (2026-09-04) — RIGGED CLASS MODELS DONE and verified
 end-to-end (Vision 6.8; capsule stand-ins retired on BOTH local player and
