@@ -44,6 +44,11 @@ public partial class WardenModel : Node3D
     private string _locomotionClip = ClipIdle;
     private bool _dead;
 
+    /// <summary>False (default): the local warden's bone-white plate. True:
+    /// colder, darker steel for ENEMY wardens so the silhouettes stay
+    /// distinguishable at iso zoom (Vision 6.8).</summary>
+    [Export] public bool EnemyTint { get; set; }
+
     public override void _Ready()
     {
         var packed = GD.Load<PackedScene>(PackScene);
@@ -118,7 +123,9 @@ public partial class WardenModel : Node3D
                     };
                     _bodyMaterial.SetShaderParameter("albedo_tex",
                         GD.Load<Texture2D>("res://Godot - UE/T_Superhero_Male_Dark.png"));
-                    _bodyMaterial.SetShaderParameter("tint", new Color(0.62f, 0.66f, 0.74f, 1f));
+                    _bodyMaterial.SetShaderParameter("tint", EnemyTint
+                        ? new Color(0.42f, 0.46f, 0.54f, 1f)   // cold steel #8a919c direction
+                        : new Color(0.62f, 0.66f, 0.74f, 1f)); // bone-white plate
                     _bodyMaterial.SetShaderParameter("roughness_v", 0.62f);
                     _bodyMaterial.SetShaderParameter("metallic_v", 0.45f);
                     mi.MaterialOverride = _bodyMaterial;

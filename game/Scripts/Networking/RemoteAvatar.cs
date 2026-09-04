@@ -1,15 +1,17 @@
 using Godot;
 using Hollowcrown.Combat;
+using Hollowcrown.Player;
 using Hollowcrown.World;
 
 namespace Hollowcrown.Networking;
 
 /// <summary>
-/// Mirrored body of ANOTHER peer's warden (Vision 6.8): capsule silhouette +
-/// red enemy nameplate, lerped toward 10 Hz authority-relayed positions. The
-/// local player is a full PlayerController; this node is a puppet. It is also
-/// an ICombatTarget so authority broadcasts (damage numbers, death, respawn)
-/// find it by peer id on every client.
+/// Mirrored body of ANOTHER peer's warden (Vision 6.8): rigged enemy model
+/// (cold steel, red nameplate), lerped toward 10 Hz authority-relayed
+/// positions. The local player is a full PlayerController; this node is a
+/// puppet — its clips are DRIVEN: locomotion from the observed velocity,
+/// hit reaction + death from authority broadcasts. It is also an
+/// ICombatTarget so authority broadcasts find it by peer id on every client.
 /// </summary>
 public partial class RemoteAvatar : Node3D, ICombatTarget
 {
@@ -26,27 +28,23 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
     private const float LerpRate = 12f;   // 1/s approach toward relayed state
 
     private Node3D _visual = null!;
-    private MeshInstance3D _capsule = null!;
+    private WardenModel? _model;
     private Label3D _nameplate = null!;
-    private Vector3 _targetPos;
+    private Vector3 _targetPos, _lastPos;
     private float _targetYaw, _fallTimer, _punchTimer;
 
     public override void _Ready()
     {
         AddToGroup("combat_targets");   // kit candidate set (dummies + players)
         _targetPos = Position;
+        _lastPos = Position;
         Hp = MaxHp;
 
         _visual = new Node3D { Name = "Visual" };
-        _capsule = new MeshInstance3D
-        {
-            Mesh = new CapsuleMesh { Radius = 0.35f, Height = 1.8f },
-            // Cold steel for the OTHER warden — the local player wears the
-            // bone accent; silhouettes stay distinguishable (Vision 6.8).
-            MaterialOverride = MaterialFactory.PlayerSteel(),
-            Position = new Vector3(0, 0.9f, 0),
-        };
-        _visual.AddChild(_capsule);
+        // Rigged enemy warden (Vision 6.8): same class model, colder steel so
+        // friend vs foe reads at iso zoom. The capsule stand-in is retired.
+        _model = new WardenModel { Name = "Model", EnemyTint = true };
+        _visual.AddChild(_model);
         AddChild(_visual);
 
         // Enemy nameplate: blood red, billboarded, above the head (Vision 6.8).
@@ -57,12 +55,12 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
             PixelSize = 0.004f,
             FontSize = 40,
             OutlineSize = 10,
-            Position = new Vector3(0, 2.3f, 0),
+            Position = new Vector3(0, 2.35f, 0),
         };
         _nameplate.Modulate = new Color("c0392b").Lerp(new Color("7a1414"), 0.5f);
         AddChild(_nameplate);
 
-        GD.Print($"REMOTE AVATAR READY — {DisplayName} (enemy, red nameplate)");
+        GD.Print($"REMOTE AVATAR READY — {DisplayName} (rigged enemy model, red nameplate)");
     }
 
     /// <summary>Authority-relayed state (10 Hz): the puppet lerps to it.</summary>
@@ -83,8 +81,7 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
             {
                 _fallTimer -= delta;
                 float t = 1f - Mathf.Max(0f, _fallTimer) / FallDuration;
-                _visual.RotationDegrees = new Vector3(90f * t, 0, 0);
-                _capsule.Transparency = t * 0.6f;
+                _model?.PlayDeath(t);
             }
             return;
         }
@@ -93,15 +90,23 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
         float yaw = Mathf.LerpAngle(Mathf.DegToRad(RotationDegrees.Y), _targetYaw, w);
         RotationDegrees = new Vector3(0, Mathf.RadToDeg(yaw), 0);
 
+        // Locomotion clips from the OBSERVED velocity of the relay (the
+        // puppet has no input of its own).
+        float speed = delta > 0.001f
+            ? GlobalPosition.DistanceTo(_lastPos) / delta
+            : 0f;
+        _lastPos = GlobalPosition;
+        _model?.PlayLocomotion(speed, false);
+
         if (_punchTimer > 0f)                      // hit feedback (Vision 6.9)
         {
             _punchTimer -= delta;
             float s = 1f + 0.08f * (_punchTimer / 0.12f);
-            _capsule.Scale = new Vector3(s, s, s);
+            _visual.Scale = new Vector3(s, s, s);
         }
-        else if (_capsule.Scale.X > 1f)
+        else if (_visual.Scale.X > 1f)
         {
-            _capsule.Scale = Vector3.One;
+            _visual.Scale = Vector3.One;
         }
     }
 
@@ -116,6 +121,7 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
         Hp = hpAfter;
         DamageNumber.Spawn(this, GlobalPosition, amount, heavy);
         _punchTimer = 0.12f;
+        _model?.PlayHit();
     }
 
     public void OnStunned(float seconds) { /* stun visual lands with PvP polish */ }
@@ -131,10 +137,11 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
     {
         IsDead = false;
         Hp = hpAfter;
+        _model?.ResetPose();
         _visual.RotationDegrees = Vector3.Zero;
-        _capsule.Transparency = 0f;
         _targetPos = spawnPos;
         GlobalPosition = spawnPos;                 // respawn teleports
+        _lastPos = spawnPos;
         GD.Print($"REMOTE AVATAR RESPAWNED — {DisplayName} at {spawnPos}");
     }
 }
