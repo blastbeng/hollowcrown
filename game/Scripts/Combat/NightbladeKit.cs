@@ -91,13 +91,19 @@ public partial class NightbladeKit : Node3D, IAbilityProvider
             toAim = -_pc.GlobalBasis.Z;
         Vector3 dir = toAim.Normalized();
 
-        // Never blink inside a wall: ray along the blink path, shorten on hit.
+        // Never blink inside a wall: ray along the blink path, shorten on
+        // hit. Combat bodies (dummies, players) do NOT block the shadow
+        // step — you blink through enemies; only world geometry does.
         float dist = StepDistance;
+        var exclude = new Godot.Collections.Array<Rid> { _pc.GetRid() };
+        foreach (var node in GetTree().GetNodesInGroup("combat_targets"))
+            if (node is CollisionObject3D body)
+                exclude.Add(body.GetRid());
         var space = _pc.GetWorld3D().DirectSpaceState;
         var query = PhysicsRayQueryParameters3D.Create(
             _pc.GlobalPosition + new Vector3(0, 1.0f, 0),
             _pc.GlobalPosition + new Vector3(0, 1.0f, 0) + dir * StepDistance);
-        query.Exclude = new Godot.Collections.Array<Rid> { _pc.GetRid() };
+        query.Exclude = exclude;
         var hit = space.IntersectRay(query);
         if (hit.Count > 0)
         {
