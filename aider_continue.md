@@ -188,6 +188,22 @@ compile check (remote or local):
 13. Robustness: rejoin UX (kicked/lost peers currently just resume offline),
     position-report trust checks (anti-cheat), nameplate HP bars.
 
+SESSION 8 NOTE (2026-09-04) — FULL REPO REVIEW done (verdict: first steps
+sound — architecture, authority model, security basics and tooling all match
+the spec). Review fixes committed f795265: CentralClient no longer leaks
+network exceptions as unobserved task faults (UI "central unreachable?"
+statuses fire now); central heartbeat field-length caps + expired-token
+purge on auth; ArenaHud player HP row (server-mirrored); PlayerController
+_mcp_state exposes hp/dead/stunned/peer_id. REVIEW DEFERRALS (known, not
+bugs-now): (a) /servers/heartbeat is unauthenticated and PUT progress only
+needs a user token — Vision 4 wants match-server tokens; land them with the
+MMR endpoints (NEXT TASKS 7). (b) Kick/disconnect UX: a wrong-password kick
+or server drop silently resumes offline mode with the arena loaded — UI
+notification + return-to-menu is NEXT TASKS 13. (c) --join failure with a
+dead host leaves a black screen (Main never built the menu UI) — fold the
+fix into the rejoin task. (d) Central has no rate limiting and tokens are
+stored plaintext in SQLite (fine for v1; harden before any public host).
+
 SESSION 7 NOTE (2026-09-04) — REALM HANDSHAKE + NETWORKED PLAYERS DONE and
 verified end-to-end (Vision 4 + 9). New: password handshake RPC right after
 ENet connect (wrong password = SceneMultiplayer.DisconnectPeer kick; client
