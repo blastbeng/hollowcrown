@@ -8,9 +8,9 @@ namespace Hollowcrown.UI;
 
 /// <summary>
 /// Arena HUD (Vision 6.10 isometric convention): bottom-center ability bar
-/// (Q/E/R/F slots with cooldown sweeps), stamina bar above it, target frame
-/// top-center with the nearest live dummy's HP. Every element shows REAL
-/// state — no placeholder bars. Player HP arrives with server-owned combat.
+/// (Q/E/R/F slots with cooldown sweeps), HP + stamina bars above it, target
+/// frame top-center with the nearest live target's HP. Every element shows
+/// REAL state — no placeholder bars; HP is the server-mirrored value.
 /// </summary>
 public partial class ArenaHud : CanvasLayer
 {
@@ -20,6 +20,8 @@ public partial class ArenaHud : CanvasLayer
 
     private PlayerController _pc = null!;
     private WardenKit _kit = null!;
+    private ProgressBar _hpBar = null!;
+    private Label _hpText = null!;
     private ProgressBar _staminaBar = null!;
     private Label _staminaText = null!;
     private PanelContainer _targetFrame = null!;
@@ -74,6 +76,34 @@ public partial class ArenaHud : CanvasLayer
         column.OffsetTop = -118f; column.OffsetBottom = -14f;
         column.AddThemeConstantOverride("separation", 6);
         root.AddChild(column);
+
+        // HP row: server-mirrored combat state (Vision 2.3 — never a local guess).
+        var hpRow = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        hpRow.AddThemeConstantOverride("separation", 8);
+        column.AddChild(hpRow);
+
+        _hpBar = new ProgressBar
+        {
+            MinValue = 0, MaxValue = 100, Value = 100,
+            ShowPercentage = false,
+            CustomMinimumSize = new Vector2(280, 14),
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _hpBar.AddThemeStyleboxOverride("background",
+            SlotBox(new Color("#0d0c10"), UiTheme.PanelBorder));
+        _hpBar.AddThemeStyleboxOverride("fill",
+            SlotBox(UiTheme.Danger, UiTheme.Danger));
+        hpRow.AddChild(_hpBar);
+
+        _hpText = new Label
+        {
+            Text = "100/100",
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        };
+        _hpText.AddThemeFontSizeOverride("font_size", 12);
+        hpRow.AddChild(_hpText);
 
         // Stamina row: bar + numeric readout (real PlayerController state).
         var staminaRow = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -265,7 +295,10 @@ public partial class ArenaHud : CanvasLayer
 
     public override void _Process(double delta)
     {
-        // Stamina (real state).
+        // HP + stamina (real state; HP mirrors the match server).
+        _hpBar.MaxValue = _pc.MaxHp;
+        _hpBar.Value = _pc.Hp;
+        _hpText.Text = $"{_pc.Hp}/{_pc.MaxHp}";
         _staminaBar.Value = _pc.Stamina;
         _staminaText.Text = $"{_pc.Stamina:0}";
 

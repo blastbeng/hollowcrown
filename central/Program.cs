@@ -77,6 +77,8 @@ app.MapPost("/auth/register", (AuthRequest r) =>
     }
 
     var token = PasswordHasher.NewToken();
+    // Opportunistic housekeeping: expired tokens never accumulate.
+    conn.Exec("DELETE FROM tokens WHERE expires_at <= $now", ("$now", Db.Now()));
     conn.Exec("INSERT INTO tokens(token, user_id, expires_at) VALUES ($t, (SELECT id FROM users WHERE username = $u), $e)",
         ("$t", token), ("$u", r.User), ("$e", DateTime.UtcNow.AddDays(7).ToString("o")));
     return Results.Json(new AuthResponse(token, r.User), options: jsonOptions);
@@ -97,6 +99,7 @@ app.MapPost("/auth/login", (AuthRequest r) =>
     }
 
     var token = PasswordHasher.NewToken();
+    conn.Exec("DELETE FROM tokens WHERE expires_at <= $now", ("$now", Db.Now()));
     conn.Exec("INSERT INTO tokens(token, user_id, expires_at) VALUES ($t, (SELECT id FROM users WHERE username = $u), $e)",
         ("$t", token), ("$u", r.User), ("$e", DateTime.UtcNow.AddDays(7).ToString("o")));
     return Results.Json(new AuthResponse(token, r.User), options: jsonOptions);
@@ -186,6 +189,11 @@ app.MapPost("/servers/heartbeat", (ServerRegistration r) =>
     if (string.IsNullOrWhiteSpace(r.ServerId) || string.IsNullOrWhiteSpace(r.Name) || string.IsNullOrWhiteSpace(r.Mode))
         return Fail(400, "serverId, name and mode are required");
     if (r.Port is < 1 or > 65535) return Fail(400, "port must be 1-65535");
+    // Length caps: the registry is publicly writable until server tokens land,
+    // so nothing oversized/unsanitized may reach the DB.
+    if (r.ServerId.Length > 64 || r.Name.Length > 64 || r.Mode.Length > 16 ||
+        r.Host is { Length: > 64 })
+        return Fail(400, "serverId/name/mode/host exceed length limits");
 
     using var conn = Db.Open();
     conn.Exec("""

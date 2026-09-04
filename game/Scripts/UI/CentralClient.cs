@@ -63,36 +63,65 @@ public partial class CentralClient : Node
 
     public async Task<List<CharacterDto>?> ListCharacters()
     {
-        using var resp = await Authed(HttpMethod.Get, "characters");
-        return resp.IsSuccessStatusCode
-            ? await resp.Content.ReadFromJsonAsync<List<CharacterDto>>(JsonOpts)
-            : null;
+        try
+        {
+            using var resp = await Authed(HttpMethod.Get, "characters");
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<List<CharacterDto>>(JsonOpts)
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;   // caller shows "central unreachable?" status
+        }
     }
 
     public async Task<CharacterDto?> CreateCharacter(string name, string classId)
     {
-        using var resp = await Authed(HttpMethod.Post, "characters", new CreateCharacterRequest(name, classId));
-        return resp.IsSuccessStatusCode
-            ? await resp.Content.ReadFromJsonAsync<CharacterDto>(JsonOpts)
-            : null;
+        try
+        {
+            using var resp = await Authed(HttpMethod.Post, "characters",
+                new CreateCharacterRequest(name, classId));
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<CharacterDto>(JsonOpts)
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;   // caller shows "central unreachable?" status
+        }
     }
 
     public async Task<CharacterDto?> SaveProgress(int characterId, int level, int xp, string gearJson)
     {
-        using var resp = await Authed(HttpMethod.Put, $"characters/{characterId}/progress",
-            new ProgressRequest(level, xp, gearJson));
-        return resp.IsSuccessStatusCode
-            ? await resp.Content.ReadFromJsonAsync<CharacterDto>(JsonOpts)
-            : null;
+        try
+        {
+            using var resp = await Authed(HttpMethod.Put, $"characters/{characterId}/progress",
+                new ProgressRequest(level, xp, gearJson));
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<CharacterDto>(JsonOpts)
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;   // caller decides how to surface the failure
+        }
     }
 
     public async Task<List<ServerInfo>?> ListServers(string mode = "")
     {
         var query = mode.Length > 0 ? $"?mode={Uri.EscapeDataString(mode)}" : "";
-        using var resp = await Authed(HttpMethod.Get, $"servers{query}");
-        return resp.IsSuccessStatusCode
-            ? await resp.Content.ReadFromJsonAsync<List<ServerInfo>>(JsonOpts)
-            : null;
+        try
+        {
+            using var resp = await Authed(HttpMethod.Get, $"servers{query}");
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<List<ServerInfo>>(JsonOpts)
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;   // caller shows "central unreachable?" status
+        }
     }
 
     /// <summary>Match-server registry heartbeat (unauthenticated by design for now).</summary>

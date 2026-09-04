@@ -379,6 +379,11 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     /// <summary>Rich state for the playtester runtime digest (mcp_watch).</summary>
     public Godot.Collections.Dictionary _mcp_state() => new()
     {
+        ["hp"] = Hp,
+        ["max_hp"] = MaxHp,
+        ["dead"] = IsDead,
+        ["stunned"] = IsStunned,
+        ["peer_id"] = PeerId,
         ["stamina"] = Stamina,
         ["sprinting"] = IsSprinting,
         ["dodging"] = IsDodging,
