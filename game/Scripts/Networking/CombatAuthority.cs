@@ -206,6 +206,10 @@ public partial class CombatAuthority : Node
         if (info.Approved)
             return;
 
+        // Always apply the DECLARED class (the connect event may have won the
+        // race and created the record with the default id).
+        info.ClassId = classId;
+
         if (password != DedicatedServer.RealmPassword)
         {
             GD.Print($"REALM: peer {peer} KICKED — wrong password");
