@@ -85,6 +85,8 @@ public partial class CombatAuthority : Node
         public void OnStunned(float seconds) { }
         public void OnStealthed(bool stealthed) { }
         public void OnRooted(float seconds) { }
+        public void OnWard(float amount) { }
+        public void OnHealed(int hpAfter) { }
         public void OnKilled() { }
         public void OnRespawned(int hpAfter, Vector3 spawnPos) { }
     }
@@ -101,6 +103,9 @@ public partial class CombatAuthority : Node
     private readonly Dictionary<int, double> _stealthUntil = new();
     private readonly Dictionary<int, double> _lastSmokeAt = new();
     private readonly Dictionary<int, double> _lastStealthAt = new();
+    private readonly Dictionary<int, float> _wards = new();          // absorb pools
+    private readonly Dictionary<int, double> _wardUntil = new();
+    private readonly Dictionary<int, double> _lastWardAt = new();
     private int _nextSmokeZone;
     private int _nextId = 1000;                      // static world targets
     private int _spawnCounter;
@@ -445,6 +450,16 @@ public partial class CombatAuthority : Node
             RpcId(1, nameof(SubmitSmokeRpc), pos);
     }
 
+    /// <summary>Revenant soul ward (Vision 7): the server owns the absorb
+    /// pool, its duration and the cooldown.</summary>
+    public void RequestWard()
+    {
+        if (IsAuthorityMode)
+            ApplyWard(MyPeerId);
+        else
+            RpcId(1, nameof(SubmitWardRpc));
+    }
+
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void SubmitHitRpc(int victimId, int attackId, Vector3 attackerPos, Vector3 facing)
@@ -465,6 +480,11 @@ public partial class CombatAuthority : Node
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void SubmitSmokeRpc(Vector3 pos)
         => ValidateAndSpawnSmoke(Multiplayer.GetRemoteSenderId(), pos);
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void SubmitWardRpc()
+        => ApplyWard(Multiplayer.GetRemoteSenderId());
 
     // --------------------------- server validation -------------------------
 
@@ -559,6 +579,29 @@ public partial class CombatAuthority : Node
         }
         mult = Mathf.Min(mult, CombatTables.MaxTotalMultiplier);
         int dmg = Mathf.RoundToInt(atk.Damage * mult);
+
+        // Revenant soul ward (Vision 7): the absorb pool eats damage BEFORE
+        // HP — a fully absorbed hit leaves the victim untouched.
+        if (dmg > 0 && _wards.TryGetValue(victimId, out float ward) && ward > 0f)
+        {
+            float absorbed = Mathf.Min(ward, dmg);
+            dmg -= (int)absorbed;
+            ward -= absorbed;
+            if (ward <= 0f)
+            {
+                _wards.Remove(victimId);
+                _wardUntil.Remove(victimId);
+            }
+            else
+            {
+                _wards[victimId] = ward;
+            }
+            SendWardState(victimId, Mathf.Max(0f, ward));
+            GD.Print($"AUTHORITY: ward victim={victimId} absorbed {absorbed:0} " +
+                     $"({Mathf.Max(0f, ward):0} left)");
+            if (dmg <= 0)
+                return;   // fully absorbed: no HP change, no kill logic
+        }
         int hpAfter = Mathf.Max(0, hp - dmg);
         bool killed = hpAfter == 0;
         _hp[victimId] = hpAfter;
@@ -568,6 +611,21 @@ public partial class CombatAuthority : Node
             SendTargetStunned(victimId, atk.StunSeconds);
         if (atk.RootSeconds > 0f && !killed)
             SendTargetRooted(victimId, atk.RootSeconds);
+
+        // Revenant life drain (Vision 7): heal the attacker for a fraction
+        // of the damage — server-owned, capped at max HP.
+        if (atk.HealFraction > 0f && dmg > 0 &&
+            _hp.TryGetValue(attackerPeer, out int ahp) && ahp < _maxHp[attackerPeer])
+        {
+            int heal = Mathf.RoundToInt(dmg * atk.HealFraction);
+            int ahpAfter = Mathf.Min(_maxHp[attackerPeer], ahp + heal);
+            if (ahpAfter > ahp)
+            {
+                _hp[attackerPeer] = ahpAfter;
+                SendHealed(attackerPeer, ahpAfter);
+                GD.Print($"AUTHORITY: drain heal attacker={attackerPeer} +{ahpAfter - ahp} hp={ahpAfter}");
+            }
+        }
         if (killed)
         {
             SendKillFeed($"{PeerName(attackerPeer)} slew {victim.DisplayName}");
@@ -591,6 +649,56 @@ public partial class CombatAuthority : Node
 
     private float BuffOf(int peer, double now) =>
         _buffs.TryGetValue(peer, out var b) && b.Until > now ? b.Mult : 1f;
+
+    private void ApplyWard(int peer)
+    {
+        double now = Time.GetTicksMsec() / 1000.0;
+        if (_lastWardAt.TryGetValue(peer, out double last) &&
+            now - last < CombatTables.SoulWardCooldown - 0.05)
+        {
+            Reject($"ward peer={peer}: cooldown " +
+                   $"({now - last:0.00}s < {CombatTables.SoulWardCooldown:0.00}s)");
+            return;
+        }
+        _lastWardAt[peer] = now;
+        _wards[peer] = CombatTables.SoulWardAbsorb;
+        _wardUntil[peer] = now + CombatTables.SoulWardDuration;
+        SendWardState(peer, CombatTables.SoulWardAbsorb);
+        GD.Print($"AUTHORITY: ward peer={peer} absorbs {CombatTables.SoulWardAbsorb:0} " +
+                 $"for {CombatTables.SoulWardDuration:0}s");
+    }
+
+    private void SendWardState(int peerId, float amount)
+    {
+        if (Networked)
+            Rpc(nameof(WardStateRpc), peerId, amount);
+        else
+            WardStateRpc(peerId, amount);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void WardStateRpc(int peerId, float amount)
+    {
+        if (_targets.TryGetValue(peerId, out var target))
+            target.OnWard(amount);
+    }
+
+    private void SendHealed(int peerId, int hpAfter)
+    {
+        if (Networked)
+            Rpc(nameof(HealedRpc), peerId, hpAfter);
+        else
+            HealedRpc(peerId, hpAfter);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void HealedRpc(int peerId, int hpAfter)
+    {
+        if (_targets.TryGetValue(peerId, out var target))
+            target.OnHealed(hpAfter);
+    }
 
     private void ApplyStealth(int peer)
     {
@@ -797,6 +905,23 @@ public partial class CombatAuthority : Node
             }
         }
 
+        // Soul ward expiry: the pool dies unspent after its duration.
+        if (IsAuthorityMode && _wardUntil.Count > 0)
+        {
+            double now3 = Time.GetTicksMsec() / 1000.0;
+            List<int> wardsGone = new();
+            foreach (var (id, until) in _wardUntil)
+                if (now3 >= until)
+                    wardsGone.Add(id);
+            foreach (int id in wardsGone)
+            {
+                _wardUntil.Remove(id);
+                _wards.Remove(id);
+                SendWardState(id, 0f);
+                GD.Print($"AUTHORITY: ward expired peer={id}");
+            }
+        }
+
         // Client -> server position report (10 Hz, unreliable).
         if (Networked && !IsAuthorityMode &&
             _targets.TryGetValue(MyPeerId, out var self) && self is PlayerController pc)
@@ -838,5 +963,6 @@ public partial class CombatAuthority : Node
         ["pending_respawns"] = _respawnAt.Count,
         ["stealthed"] = string.Join(",", _stealthUntil.Keys),
         ["smoke_zones"] = GetTree().GetNodesInGroup("smoke_zone").Count,
+        ["wards"] = string.Join(",", _wards.Keys),
     };
 }

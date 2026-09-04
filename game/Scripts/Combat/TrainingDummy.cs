@@ -122,6 +122,16 @@ public partial class TrainingDummy : StaticBody3D, ICombatTarget
         // Static targets can't be rooted.
     }
 
+    public void OnWard(float amount)
+    {
+        // Static targets can't ward.
+    }
+
+    public void OnHealed(int hpAfter)
+    {
+        // Dummies are never healed.
+    }
+
     public void OnKilled()
     {
         IsDead = true;

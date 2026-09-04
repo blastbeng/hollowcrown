@@ -74,6 +74,17 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 | revenant_model | 1.85 m   | staff + hood variant (in WardenModel pipeline) |
 | slice 2        | R + F    | life drain (channel line) + soul ward (absorb) |
 
+## Revenant kit, slice 2 (Vision 7; RevenantKit.cs — server fields in CombatTables)
+| name            | value     | notes                                            |
+|-----------------|-----------|--------------------------------------------------|
+| life_drain      | R         | 2 s channel: 4 ticks x 8 dmg along 6 m x 1.2 m   |
+| drain_leech     | 50%       | heals the caster per tick, server-owned, caps max |
+| drain_cost      | 20        | stamina; cooldown 12 s                           |
+| drain_breaks    | death/stun| channel stops (movement allowed)                 |
+| soul_ward       | F         | absorbs up to 40 dmg BEFORE HP, lasts 8 s max    |
+| ward_cooldown   | 12 s      | server-enforced; pool server-owned               |
+| ward_visual     | arcane disc| under the caster while the pool is up           |
+
 ## Training dummy (TrainingDummy.cs — combat verification target)
 | name         | value | notes                            |
 |--------------|-------|----------------------------------|

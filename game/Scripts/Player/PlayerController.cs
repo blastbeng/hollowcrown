@@ -59,6 +59,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     public bool IsDead { get; private set; }
     public bool IsStunned => _stunTimer > 0f;
     public bool IsRooted => _rootTimer > 0f;   // cannot move, CAN still fight
+    public float WardAmount { get; private set; }   // soul-ward mirror (visual)
     public int CombatId => PeerId;
     public Vector3 CombatPosition => GlobalPosition;
     public string DisplayName => $"{PlayerClassInfo.Label(Class)}#{PeerId}";
@@ -102,6 +103,23 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
             return;
         _rootTimer = Mathf.Max(_rootTimer, seconds);
         GD.Print($"{PlayerClassInfo.Label(Class).ToUpperInvariant()} ROOTED {seconds:0.00}s (authority)");
+    }
+
+    /// <summary>Authority-broadcast soul ward (absorb pool mirror).</summary>
+    public void OnWard(float amount)
+    {
+        WardAmount = Mathf.Max(0f, amount);
+        GD.Print($"REVENANT WARD {WardAmount:0} (authority)");
+    }
+
+    /// <summary>Authority-broadcast heal (life drain): mirrors HP only —
+    /// the server owns the number.</summary>
+    public void OnHealed(int hpAfter)
+    {
+        if (IsDead)
+            return;
+        Hp = Mathf.Clamp(hpAfter, 0, MaxHp);
+        GD.Print($"{PlayerClassInfo.Label(Class)} HEALED to {Hp}/{MaxHp} (authority)");
     }
 
     public void OnKilled()
@@ -415,6 +433,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         ["class"] = PlayerClassInfo.Label(Class),
         ["stealthed"] = IsStealthed,
         ["rooted"] = IsRooted,
+        ["ward"] = WardAmount,
         ["stamina"] = Stamina,
         ["sprinting"] = IsSprinting,
         ["dodging"] = IsDodging,

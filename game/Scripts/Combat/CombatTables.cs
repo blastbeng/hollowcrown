@@ -20,6 +20,7 @@ public enum AttackId
     DaggerFinisher = 7,// nightblade chain, heavy finisher
     BoneSpear = 8,     // revenant kit, Q — ground-line projectile
     GraveGrasp = 9,    // revenant kit, E — root circle
+    DrainTick = 10,    // revenant kit, R — life drain channel tick
 }
 
 public enum AttackShape
@@ -34,7 +35,7 @@ public static class CombatTables
         int Damage, bool Heavy, float Range, float ArcDegrees,
         float StunSeconds, float MinInterval,
         AttackShape Shape = AttackShape.Arc, float Width = 0f,
-        float RootSeconds = 0f);
+        float RootSeconds = 0f, float HealFraction = 0f);
 
     // BALANCE.md: warden_chain (20/20/35, 2.4 m, 120 deg), warden_bash
     // (15, 3.2 m, 90 deg, 0.5 s stun, 6 s cd). MinInterval is the server's
@@ -57,7 +58,16 @@ public static class CombatTables
             AttackShape.Line, 1.2f),
         [(int)AttackId.GraveGrasp] = new(6, false, 4.5f, 360f, 0f, 8.5f,
             AttackShape.Arc, 0f, 1.0f),
+        // BALANCE.md: revenant_drain — 4 x 8 dmg ticks along a 6 m x 1.2 m
+        // line; the caster heals 50% of each tick's damage (server-side).
+        [(int)AttackId.DrainTick] = new(8, false, 6f, 360f, 0f, 0.35f,
+            AttackShape.Line, 1.2f, 0f, 0.5f),
     };
+
+    // --- Soul ward (BALANCE.md: revenant_ward) — server-owned absorb pool.
+    public const float SoulWardAbsorb = 40f;
+    public const float SoulWardDuration = 8f;
+    public const float SoulWardCooldown = 12f;
 
     public static Attack Get(int id) => Table.TryGetValue(id, out var atk)
         ? atk

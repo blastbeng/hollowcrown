@@ -37,6 +37,14 @@ public interface ICombatTarget
     /// fight — unlike stun).</summary>
     void OnRooted(float seconds);
 
+    /// <summary>Authority broadcast: the soul-ward pool changed (absorb
+    /// shield). 0 = ward gone. Visual-only mirror.</summary>
+    void OnWard(float amount);
+
+    /// <summary>Authority broadcast: HP raised (life drain heal). Mirrors
+    /// the authoritative value only.</summary>
+    void OnHealed(int hpAfter);
+
     /// <summary>Authority broadcast: stealth state changed (nightblade).
     /// Targets that can't stealth ignore it.</summary>
     void OnStealthed(bool stealthed);

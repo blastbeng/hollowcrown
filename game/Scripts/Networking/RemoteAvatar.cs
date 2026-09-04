@@ -146,6 +146,16 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
         // Root visual lands with PvP polish; the server keeps the timer.
     }
 
+    public void OnWard(float amount)
+    {
+        // Ward visual lands with PvP polish.
+    }
+
+    public void OnHealed(int hpAfter)
+    {
+        Hp = Mathf.Clamp(hpAfter, 0, MaxHp);   // puppet mirror of authority HP
+    }
+
     public void OnKilled()
     {
         IsDead = true;
