@@ -25,10 +25,8 @@ public partial class WardenModel : Node3D
     // the model wrapper turns around once. Verified against movement.
     private const float ModelYawDegrees = 180f;
 
-    // Palette (Vision 6.11): cold steel armor, bone trim, dark leather straps.
-    // The suit texture is warm tan — the blue-gray tint must be strong enough
-    // to pull it to plate steel on screen.
-    private static readonly Color ArmorTint = new(0.60f, 0.66f, 0.80f);
+    // Palette (Vision 6.11): cold steel plate via the grayscale-limb shader;
+    // warm bone trim, dark leather straps.
     private static readonly Color TrimTint = new(0.58f, 0.50f, 0.36f);
 
     private const string ClipIdle = Lib + "Idle";
@@ -40,6 +38,7 @@ public partial class WardenModel : Node3D
     private const string ClipDeath = Lib + "Death01";
 
     private AnimationPlayer? _anim;
+    private ShaderMaterial? _bodyMaterial;
     private readonly List<StandardMaterial3D> _fadeMaterials = new();
     private string? _oneshot;
     private string _locomotionClip = ClipIdle;
@@ -110,13 +109,19 @@ public partial class WardenModel : Node3D
             switch (mi.Name)
             {
                 case "SuperHero_Male":
-                    mat.AlbedoTexture = GD.Load<Texture2D>("res://Godot - UE/T_Superhero_Male_Dark.png");
-                    mat.NormalEnabled = true;
-                    mat.NormalTexture = GD.Load<Texture2D>("res://Godot - UE/T_Superhero_Male_Normal.png");
-                    mat.RoughnessTexture = GD.Load<Texture2D>("res://Godot - UE/T_Superhero_Male_Roughness.png");
-                    mat.AlbedoColor = new Color(ArmorTint, 1f);
-                    mat.Metallic = 0.4f;
-                    mat.Roughness = 0.66f;
+                    // Grayscale-luminance shader: the suit texture is warm
+                    // tan; only an absolute tint (not a multiply) reads as
+                    // cold plate steel (Vision 6.11).
+                    _bodyMaterial = new ShaderMaterial
+                    {
+                        Shader = GD.Load<Shader>("res://Shaders/steel_limb.gdshader"),
+                    };
+                    _bodyMaterial.SetShaderParameter("albedo_tex",
+                        GD.Load<Texture2D>("res://Godot - UE/T_Superhero_Male_Dark.png"));
+                    _bodyMaterial.SetShaderParameter("tint", new Color(0.62f, 0.66f, 0.74f, 1f));
+                    _bodyMaterial.SetShaderParameter("roughness_v", 0.62f);
+                    _bodyMaterial.SetShaderParameter("metallic_v", 0.45f);
+                    mi.MaterialOverride = _bodyMaterial;
                     break;
                 case "Eyes":
                     mat.AlbedoTexture = GD.Load<Texture2D>("res://Godot - UE/T_Eye_Brown.png");
@@ -270,6 +275,7 @@ public partial class WardenModel : Node3D
             _anim.SpeedScale = 1f;
         }
         float a = Mathf.Clamp(1f - fadeAlpha, 0.15f, 1f);
+        _bodyMaterial?.SetShaderParameter("alpha_v", a);
         foreach (var mat in _fadeMaterials)
             mat.AlbedoColor = new Color(mat.AlbedoColor, a);
     }
@@ -280,6 +286,7 @@ public partial class WardenModel : Node3D
         _dead = false;
         _oneshot = null;
         _locomotionClip = ClipIdle;
+        _bodyMaterial?.SetShaderParameter("alpha_v", 1f);
         foreach (var mat in _fadeMaterials)
             mat.AlbedoColor = new Color(mat.AlbedoColor, 1f);
         _anim?.Play(ClipIdle);
