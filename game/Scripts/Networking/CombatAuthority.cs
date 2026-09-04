@@ -46,10 +46,16 @@ public partial class CombatAuthority : Node
     /// (set by ServerBrowser.Join or the --join launch flag before dialing).</summary>
     public static string PendingPassword = "";
 
+    /// <summary>Class id the NEXT outbound connection declares at handshake
+    /// ("warden"/"nightblade"/"revenant") — the server needs it for display
+    /// names and so every peer spawns the right enemy model variant.</summary>
+    public static string PendingClass = "warden";
+
     private sealed class PeerInfo
     {
         public bool Approved;
         public int SpawnIndex;
+        public string ClassId = "warden";
         public Vector3 Position;
         public float Yaw;
         public ICombatTarget? Target;
@@ -77,6 +83,7 @@ public partial class CombatAuthority : Node
         public void AssignCombatId(int id) { }
         public void OnHitApplied(int amount, bool heavy, int hpAfter) { }
         public void OnStunned(float seconds) { }
+        public void OnStealthed(bool stealthed) { }
         public void OnKilled() { }
         public void OnRespawned(int hpAfter, Vector3 spawnPos) { }
     }
@@ -89,6 +96,11 @@ public partial class CombatAuthority : Node
     private readonly Dictionary<(int Peer, int Attack), double> _lastHitAt = new();
     private readonly Dictionary<int, (float Mult, double Until)> _buffs = new();
     private readonly Dictionary<int, double> _respawnAt = new();
+    // Nightblade (Vision 7): stealth state + per-peer smoke/stealth cooldowns.
+    private readonly Dictionary<int, double> _stealthUntil = new();
+    private readonly Dictionary<int, double> _lastSmokeAt = new();
+    private readonly Dictionary<int, double> _lastStealthAt = new();
+    private int _nextSmokeZone;
     private int _nextId = 1000;                      // static world targets
     private int _spawnCounter;
     private double _positionAccum, _beatAccum;
@@ -172,19 +184,23 @@ public partial class CombatAuthority : Node
 
     private void SendHandshake()
     {
-        RpcId(1, nameof(HandshakeRpc), PendingPassword);
+        RpcId(1, nameof(HandshakeRpc), PendingPassword, PendingClass);
         GD.Print("REALM: handshake sent — awaiting approval");
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void HandshakeRpc(string password)
+    private void HandshakeRpc(string password, string classId)
     {
         int peer = Multiplayer.GetRemoteSenderId();
         if (!_peers.TryGetValue(peer, out var info))
         {
             // The client's handshake can beat the server's connect event.
-            info = new PeerInfo { SpawnIndex = _spawnCounter++ % SpawnPoints.Length };
+            info = new PeerInfo
+            {
+                SpawnIndex = _spawnCounter++ % SpawnPoints.Length,
+                ClassId = classId,
+            };
             _peers[peer] = info;
         }
         if (info.Approved)
@@ -200,7 +216,7 @@ public partial class CombatAuthority : Node
 
         info.Approved = true;
         Vector3 spawn = SpawnPoints[info.SpawnIndex];
-        string name = $"Warden#{peer}";
+        string name = $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(classId))}#{peer}";
         var record = new PeerTargetRecord(this, peer, name);
         info.Target = record;
         _targets[peer] = record;
@@ -208,8 +224,8 @@ public partial class CombatAuthority : Node
         _maxHp[peer] = PlayerMaxHp;
         _respawnPos[peer] = spawn;
         info.Position = spawn;
-        SendSpawnPlayer(peer, spawn, name);
-        GD.Print($"REALM: peer {peer} approved — spawns at {spawn}");
+        SendSpawnPlayer(peer, spawn, name, info.ClassId);
+        GD.Print($"REALM: peer {peer} approved ({info.ClassId}) — spawns at {spawn}");
 
         // Catch the new peer up with everyone already approved in the realm
         // (late joiners miss earlier broadcast spawns).
@@ -218,16 +234,18 @@ public partial class CombatAuthority : Node
             if (otherId == peer || !other.Approved)
                 continue;
             RpcId(peer, nameof(SpawnPlayerRpc), otherId,
-                SpawnPoints[other.SpawnIndex], $"Warden#{otherId}");
+                SpawnPoints[other.SpawnIndex],
+                $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(other.ClassId))}#{otherId}",
+                other.ClassId);
         }
     }
 
-    private void SendSpawnPlayer(int peerId, Vector3 spawnPos, string displayName)
+    private void SendSpawnPlayer(int peerId, Vector3 spawnPos, string displayName, string classId)
     {
         if (Networked)
-            Rpc(nameof(SpawnPlayerRpc), peerId, spawnPos, displayName);
+            Rpc(nameof(SpawnPlayerRpc), peerId, spawnPos, displayName, classId);
         else
-            SpawnPlayerRpc(peerId, spawnPos, displayName);
+            SpawnPlayerRpc(peerId, spawnPos, displayName, classId);
     }
 
     private void SendDespawnPlayer(int peerId)
@@ -240,7 +258,7 @@ public partial class CombatAuthority : Node
 
     [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void SpawnPlayerRpc(int peerId, Vector3 spawnPos, string displayName)
+    private void SpawnPlayerRpc(int peerId, Vector3 spawnPos, string displayName, string classId)
     {
         var arena = GetParent().GetNodeOrNull<Node3D>("Arena");
 
@@ -267,6 +285,7 @@ public partial class CombatAuthority : Node
                 Name = $"Remote{peerId}",
                 PeerId = peerId,
                 DisplayName = displayName,
+                ClassId = classId,
                 Position = spawnPos,
             };
             arena?.AddChild(avatar, forceReadableName: true);
@@ -401,6 +420,26 @@ public partial class CombatAuthority : Node
             RpcId(1, nameof(SubmitBuffRpc), multiplier);
     }
 
+    /// <summary>Nightblade stealth (Vision 7): the server owns the state —
+    /// cooldown, 5 s duration, break-on-attack with the +50% next hit.</summary>
+    public void RequestStealth()
+    {
+        if (IsAuthorityMode)
+            ApplyStealth(MyPeerId);
+        else
+            RpcId(1, nameof(SubmitStealthRpc));
+    }
+
+    /// <summary>Nightblade smoke bomb (Vision 7): the server validates throw
+    /// range + cooldown, then broadcasts the zone so every peer builds it.</summary>
+    public void RequestSmoke(Vector3 pos)
+    {
+        if (IsAuthorityMode)
+            ValidateAndSpawnSmoke(MyPeerId, pos);
+        else
+            RpcId(1, nameof(SubmitSmokeRpc), pos);
+    }
+
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void SubmitHitRpc(int victimId, int attackId, Vector3 attackerPos, Vector3 facing)
@@ -411,6 +450,16 @@ public partial class CombatAuthority : Node
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void SubmitBuffRpc(float multiplier)
         => ApplyBuff(Multiplayer.GetRemoteSenderId(), multiplier);
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void SubmitStealthRpc()
+        => ApplyStealth(Multiplayer.GetRemoteSenderId());
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void SubmitSmokeRpc(Vector3 pos)
+        => ValidateAndSpawnSmoke(Multiplayer.GetRemoteSenderId(), pos);
 
     // --------------------------- server validation -------------------------
 
@@ -435,6 +484,20 @@ public partial class CombatAuthority : Node
 
         var atk = CombatTables.Get(attackId);
         double now = Time.GetTicksMsec() / 1000.0;
+
+        // Nightblade smoke (Vision 7): hits OUT of or THROUGH the cloud are
+        // blind — the attacker inside the zone can't see, the victim inside
+        // it can't be seen.
+        if (SmokeZone.AnyZoneContains(this, attackerPos))
+        {
+            Reject($"hit victim={victimId} peer={attackerPeer}: attacker smoke-blind");
+            return;
+        }
+        if (SmokeZone.AnyZoneContains(this, victim.CombatPosition))
+        {
+            Reject($"hit victim={victimId} peer={attackerPeer}: victim smoke-blind");
+            return;
+        }
 
         var key = (attackerPeer, attackId);
         if (_lastHitAt.TryGetValue(key, out double last) &&
@@ -466,7 +529,16 @@ public partial class CombatAuthority : Node
         }
 
         _lastHitAt[key] = now;
-        int dmg = Mathf.RoundToInt(atk.Damage * BuffOf(attackerPeer, now));
+        // Nightblade stealth (Vision 7): the first attack breaks the state
+        // and the server adds the +50% bonus to THAT hit. Sane-capped stack.
+        float mult = BuffOf(attackerPeer, now);
+        if (_stealthUntil.Remove(attackerPeer))
+        {
+            mult *= CombatTables.StealthBonus;
+            SendStealthState(attackerPeer, false);
+        }
+        mult = Mathf.Min(mult, CombatTables.MaxTotalMultiplier);
+        int dmg = Mathf.RoundToInt(atk.Damage * mult);
         int hpAfter = Mathf.Max(0, hp - dmg);
         bool killed = hpAfter == 0;
         _hp[victimId] = hpAfter;
@@ -480,7 +552,8 @@ public partial class CombatAuthority : Node
             _respawnAt[victimId] = now + RespawnDelay;
         }
         GD.Print($"AUTHORITY: hit victim={victimId} attack={attackId} " +
-                 $"dmg={dmg} hp={hpAfter}/{_maxHp[victimId]} peer={attackerPeer}");
+                 $"dmg={dmg} hp={hpAfter}/{_maxHp[victimId]} peer={attackerPeer} " +
+                 (mult > 1f ? $"mult={mult:0.00}" : ""));
     }
 
     private void Reject(string reason) => GD.Print($"AUTHORITY REJECT: {reason}");
@@ -496,6 +569,49 @@ public partial class CombatAuthority : Node
 
     private float BuffOf(int peer, double now) =>
         _buffs.TryGetValue(peer, out var b) && b.Until > now ? b.Mult : 1f;
+
+    private void ApplyStealth(int peer)
+    {
+        double now = Time.GetTicksMsec() / 1000.0;
+        if (_lastStealthAt.TryGetValue(peer, out double last) &&
+            now - last < CombatTables.StealthCooldown - 0.05)
+        {
+            Reject($"stealth peer={peer}: cooldown " +
+                   $"({now - last:0.00}s < {CombatTables.StealthCooldown:0.00}s)");
+            return;
+        }
+        _lastStealthAt[peer] = now;
+        _stealthUntil[peer] = now + CombatTables.StealthDuration;
+        SendStealthState(peer, true);
+        GD.Print($"AUTHORITY: stealth peer={peer} for {CombatTables.StealthDuration:0}s " +
+                 $"(next hit x{CombatTables.StealthBonus:0.0})");
+    }
+
+    private void ValidateAndSpawnSmoke(int peer, Vector3 pos)
+    {
+        double now = Time.GetTicksMsec() / 1000.0;
+        if (_lastSmokeAt.TryGetValue(peer, out double last) &&
+            now - last < CombatTables.SmokeCooldown - 0.05)
+        {
+            Reject($"smoke peer={peer}: cooldown " +
+                   $"({now - last:0.00}s < {CombatTables.SmokeCooldown:0.00}s)");
+            return;
+        }
+        Vector3 from = _peers.TryGetValue(peer, out var info)
+            ? info.Position
+            : Vector3.Zero;
+        var to = pos - from;
+        to.Y = 0f;
+        if (to.Length() > CombatTables.SmokeThrowRange + RangeSlack)
+        {
+            Reject($"smoke peer={peer}: throw {to.Length():0.00} > " +
+                   $"{CombatTables.SmokeThrowRange + RangeSlack:0.00}");
+            return;
+        }
+        _lastSmokeAt[peer] = now;
+        SendSmokeZone(pos);
+        GD.Print($"AUTHORITY: smoke peer={peer} at {pos} for {CombatTables.SmokeDuration:0}s");
+    }
 
     private string PeerName(int peer) => Networked ? $"Warden#{peer}" : "You";
 
@@ -569,6 +685,41 @@ public partial class CombatAuthority : Node
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void KillFeedRpc(string text) => EmitSignal(SignalName.KillFeed, text);
 
+    private void SendStealthState(int peerId, bool stealthed)
+    {
+        if (Networked)
+            Rpc(nameof(StealthStateRpc), peerId, stealthed);
+        else
+            StealthStateRpc(peerId, stealthed);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void StealthStateRpc(int peerId, bool stealthed)
+    {
+        if (_targets.TryGetValue(peerId, out var target))
+            target.OnStealthed(stealthed);
+    }
+
+    private void SendSmokeZone(Vector3 pos)
+    {
+        if (Networked)
+            Rpc(nameof(SmokeZoneRpc), pos);
+        else
+            SmokeZoneRpc(pos);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void SmokeZoneRpc(Vector3 pos)
+    {
+        // Identical zone node on every peer (CallLocal covers the server):
+        // clients render it + use it for the blind overlay; the server's copy
+        // is the blind reference for hit validation.
+        var zone = new SmokeZone { Name = $"SmokeZone{_nextSmokeZone++}", Position = pos };
+        GetParent().AddChild(zone, forceReadableName: true);
+    }
+
     // --------------------------- timers + beats ----------------------------
 
     public override void _Process(double delta)
@@ -588,6 +739,23 @@ public partial class CombatAuthority : Node
                 _hp[id] = _maxHp[id];
                 SendTargetRespawned(id, _maxHp[id]);
                 GD.Print($"AUTHORITY: respawn victim={id} hp={_maxHp[id]}");
+            }
+        }
+
+        // Nightblade stealth expiry (Vision 7): 5 s elapse, the ghost returns
+        // without needing an attack to break it.
+        if (IsAuthorityMode && _stealthUntil.Count > 0)
+        {
+            double now2 = Time.GetTicksMsec() / 1000.0;
+            List<int> expired = new();
+            foreach (var (id, until) in _stealthUntil)
+                if (now2 >= until)
+                    expired.Add(id);
+            foreach (int id in expired)
+            {
+                _stealthUntil.Remove(id);
+                SendStealthState(id, false);
+                GD.Print($"AUTHORITY: stealth expired peer={id}");
             }
         }
 
@@ -630,5 +798,7 @@ public partial class CombatAuthority : Node
         ["target_count"] = _targets.Count,
         ["hp"] = string.Join(" ", _hp),
         ["pending_respawns"] = _respawnAt.Count,
+        ["stealthed"] = string.Join(",", _stealthUntil.Keys),
+        ["smoke_zones"] = GetTree().GetNodesInGroup("smoke_zone").Count,
     };
 }

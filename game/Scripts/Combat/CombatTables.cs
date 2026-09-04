@@ -15,6 +15,9 @@ public enum AttackId
     ChainMid = 2,      // warden chain, swing 2
     ChainFinisher = 3, // warden chain, heavy finisher
     ShieldBash = 4,    // warden kit, E
+    DaggerLight = 5,   // nightblade chain, stab 1
+    DaggerMid = 6,     // nightblade chain, stab 2
+    DaggerFinisher = 7,// nightblade chain, heavy finisher
 }
 
 public static class CombatTables
@@ -32,9 +35,26 @@ public static class CombatTables
         [(int)AttackId.ChainMid] = new(20, false, 2.4f, 120f, 0f, 0.30f),
         [(int)AttackId.ChainFinisher] = new(35, true, 2.4f, 120f, 0f, 0.45f),
         [(int)AttackId.ShieldBash] = new(15, true, 3.2f, 90f, 0.5f, 5.5f),
+        // BALANCE.md: nightblade_chain — fast light stabs, shorter reach,
+        // tighter arc than the warden (Vision 7: "fast dual-dagger chain").
+        [(int)AttackId.DaggerLight] = new(14, false, 2.0f, 100f, 0f, 0.18f),
+        [(int)AttackId.DaggerMid] = new(14, false, 2.0f, 100f, 0f, 0.18f),
+        [(int)AttackId.DaggerFinisher] = new(28, true, 2.0f, 100f, 0f, 0.35f),
     };
 
     public static Attack Get(int id) => Table.TryGetValue(id, out var atk)
         ? atk
         : new Attack(1, false, 2f, 90f, 0f, 0.5f);   // unknown id: near-harmless
+
+    // ---- Nightblade kit (Vision 7; BALANCE.md: nightblade_kit) -----------
+    public const float StealthDuration = 5f;         // breaks on attack
+    public const float StealthBonus = 1.5f;          // next hit +50% (server-computed)
+    public const float StealthCooldown = 12f;        // server-enforced per peer
+    public const float SmokeRadius = 3.5f;           // blind zone radius
+    public const double SmokeDuration = 6.0;         // seconds the zone lives
+    public const float SmokeThrowRange = 10f;        // max throw distance
+    public const float SmokeCooldown = 8f;           // server-enforced per peer
+
+    /// <summary>Sane cap for the stealth + warcry stack (anti-cheat).</summary>
+    public const float MaxTotalMultiplier = 1.75f;
 }

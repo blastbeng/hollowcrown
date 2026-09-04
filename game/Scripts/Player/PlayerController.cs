@@ -30,6 +30,16 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     [Export] public float TurnRate = 14f;           // yaw approach rate (1/s)
     [Export] public float Gravity = 18f;
 
+    /// <summary>Class of THIS body (Vision 7): picks the model variant and
+    /// the kit nodes. Set by the arena (character select flow / --class
+    /// launch flag for tests) before _Ready runs.</summary>
+    [Export] public PlayerClass Class { get; set; } = PlayerClass.Warden;
+
+    /// <summary>Class the NEXT-spawned player uses (set by Main from the
+    /// --class launch arg, or later the selected character). Static because
+    /// the arena builds the player after the boot screens.</summary>
+    public static PlayerClass PendingClass = PlayerClass.Warden;
+
     // --- Live state (HUD + combat core read these) ---
     public float Stamina { get; private set; }
     public bool IsDodging { get; private set; }
@@ -50,7 +60,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     public bool IsStunned => _stunTimer > 0f;
     public int CombatId => PeerId;
     public Vector3 CombatPosition => GlobalPosition;
-    public string DisplayName => $"Warden#{PeerId}";
+    public string DisplayName => $"{PlayerClassInfo.Label(Class)}#{PeerId}";
 
     private const float FallDuration = 0.45f;
     private float _stunTimer, _fallTimer;
@@ -71,7 +81,16 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         if (IsDead || seconds <= 0f)
             return;
         _stunTimer = Mathf.Max(_stunTimer, seconds);
-        GD.Print($"WARDEN STUNNED {seconds:0.00}s (authority)");
+        GD.Print($"{PlayerClassInfo.Label(Class).ToUpperInvariant()} STUNNED {seconds:0.00}s (authority)");
+    }
+
+    /// <summary>Authority-broadcast stealth state (nightblade): the local
+    /// body ghosts while stealthed; the +50% next-hit bonus is server-side.</summary>
+    public void OnStealthed(bool stealthed)
+    {
+        IsStealthed = stealthed;
+        _model?.SetGhost(stealthed ? 0.35f : 1f);
+        GD.Print($"{PlayerClassInfo.Label(Class)} STEALTH {(stealthed ? "ON (ghosted)" : "OFF")}");
     }
 
     public void OnKilled()
@@ -96,9 +115,11 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     // --- Shield wall + warcry buffs (Vision 7 Warden kit; WardenKit drives) ---
     [Export] public float WallStaminaDrain = 25f;   // BALANCE.md: wall_drain
     public bool IsShieldWalling { get; private set; }
+    public bool IsStealthed { get; private set; }
     private float _wallTimer;
     private float _warcryTimer;
     private float _warcryMultiplier = 1f;
+    private CanvasLayer? _blindOverlay;             // inside an enemy smoke zone (Vision 7)
 
     // --- Rigged class model (Vision 6.8): real clips, retinted, weapon sockets.
     private Node3D _visualRoot = null!;   // presentation pivot (model child)
@@ -108,17 +129,31 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     private Vector3 _dodgeDir;
     private Camera3D? _cam;
 
-    /// <summary>WardenChain calls this on every swing step so the greatsword
-    /// arc on the model matches the ground-projected hitbox flash.</summary>
-    public void PlayAttackAnim() => _model?.PlayAttack();
+    /// <summary>Class chains call this per chain step so the model's attack
+    /// clip matches the ground-projected hitbox flash.</summary>
+    public void PlayAttackAnim(int chainIndex = 0) => _model?.PlayAttack(chainIndex);
 
     public override void _Ready()
     {
-        // Rigged Warden model (Vision 6.8): the capsule stand-in is retired.
+        // Rigged class model (Vision 6.8): the capsule stand-in is retired.
         _visualRoot = new Node3D { Name = "VisualRoot" };
-        _model = new WardenModel { Name = "WardenModel" };
+        _model = new WardenModel { Name = "Model", ClassVariant = Class };
         _visualRoot.AddChild(_model);
         AddChild(_visualRoot);
+
+        // Class kit nodes (Vision 7): the chain + kit belong to the BODY so
+        // input, stamina and HUD slots all live on the same owner.
+        switch (Class)
+        {
+            case PlayerClass.Nightblade:
+                AddChild(new NightbladeChain { Name = "Chain" });
+                AddChild(new NightbladeKit { Name = "Kit" });
+                break;
+            default:
+                AddChild(new WardenChain { Name = "Chain" });
+                AddChild(new WardenKit { Name = "Kit" });
+                break;
+        }
 
         AddChild(new CollisionShape3D
         {
@@ -131,7 +166,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         Hp = MaxHp;
         AddToGroup("combat_targets");   // kit candidate set (dummies + players)
         CombatAuthority.For(this)?.RegisterSelf(this);   // join the authority's world
-        GD.Print("PLAYER CONTROLLER READY — WASD camera-relative, sprint, dodge roll (0.3 s i-frames)");
+        GD.Print($"PLAYER CONTROLLER READY — {PlayerClassInfo.Label(Class)}: WASD camera-relative, sprint, dodge roll (0.3 s i-frames)");
     }
 
     public override void _PhysicsProcess(double deltaRaw)
@@ -153,6 +188,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         if (!stunned)
             HandleDodgeInput();
         UpdateBuffTimers(delta);
+        UpdateBlindOverlay();
 
         var input = stunned
             ? Vector2.Zero
@@ -300,6 +336,28 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
             _warcryTimer -= delta;
     }
 
+    /// <summary>Blind (Vision 7 nightblade smoke): standing inside an enemy
+    /// smoke zone darkens the screen. The zone itself also REJECTS hits
+    /// server-side — this overlay is what the blinded player feels.</summary>
+    private void UpdateBlindOverlay()
+    {
+        bool blinded = SmokeZone.AnyZoneContains(this, GlobalPosition);
+        if (blinded && _blindOverlay is null)
+        {
+            _blindOverlay = new CanvasLayer { Layer = 5 };
+            var rect = new ColorRect
+            {
+                Color = new Color(0.02f, 0.02f, 0.03f, 0.6f),
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+            };
+            rect.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+            _blindOverlay.AddChild(rect);
+            AddChild(_blindOverlay);
+        }
+        if (_blindOverlay is not null)
+            _blindOverlay.Visible = blinded;
+    }
+
     private void FaceMovement(float delta)
     {
         var v = Velocity;
@@ -329,6 +387,8 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         ["dead"] = IsDead,
         ["stunned"] = IsStunned,
         ["peer_id"] = PeerId,
+        ["class"] = PlayerClassInfo.Label(Class),
+        ["stealthed"] = IsStealthed,
         ["stamina"] = Stamina,
         ["sprinting"] = IsSprinting,
         ["dodging"] = IsDodging,

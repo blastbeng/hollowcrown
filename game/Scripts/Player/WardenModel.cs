@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using Hollowcrown.Combat;
 using Hollowcrown.World;
 
 namespace Hollowcrown.Player;
@@ -18,9 +19,13 @@ public partial class WardenModel : Node3D
     private const string PackScene = "res://addons/quaternius_ik_rigged/Models_with_rigging/Male_rigged.tscn";
     private const string Lib = "UAL1_Standard/";
 
-    // Runtime-calibrated: head bone at 1.61 m natural -> 1.15 puts the head
-    // at ~1.85 m (Vision 6.4 character = 1.8 m) and the greatsword at ~1.44 m.
-    private const float BodyScale = 1.15f;
+    // Runtime-calibrated: head bone at 1.61 m natural. Warden 1.15 -> ~1.85 m
+    // (greatsword ~1.44 m); Nightblade 1.12 -> exactly the Vision 6.4 1.8 m
+    // spec — the "slim" silhouette comes from the twin 0.35 m daggers, not
+    // from shrinking the character below spec.
+    private const float BodyScaleWarden = 1.15f;
+    private const float BodyScaleNightblade = 1.12f;
+    private const float BodyScaleRevenant = 1.15f;
     // The glTF model faces +Z; the controller's body -Z faces velocity, so
     // the model wrapper turns around once. Verified against movement.
     private const float ModelYawDegrees = 180f;
@@ -33,7 +38,6 @@ public partial class WardenModel : Node3D
     private const string ClipWalk = Lib + "Walk";
     private const string ClipJog = Lib + "Jog_Fwd";
     private const string ClipRoll = Lib + "Roll";
-    private const string ClipAttack = Lib + "Sword_Attack";
     private const string ClipHit = Lib + "Hit_Chest";
     private const string ClipDeath = Lib + "Death01";
 
@@ -49,6 +53,14 @@ public partial class WardenModel : Node3D
     /// distinguishable at iso zoom (Vision 6.8).</summary>
     [Export] public bool EnemyTint { get; set; }
 
+    /// <summary>Class variant (Vision 7): same rigged pipeline, different
+    /// tint + weapon sockets + attack clips — Warden sword & shield,
+    /// Nightblade twin daggers, Revenant staff + hood. The class silhouette
+    /// IS the readability (Vision 6.8).</summary>
+    [Export] public PlayerClass ClassVariant { get; set; } = PlayerClass.Warden;
+
+    private float _ghostAlpha = 1f;   // stealth (0.35) — folded into death fade
+
     public override void _Ready()
     {
         var packed = GD.Load<PackedScene>(PackScene);
@@ -58,13 +70,19 @@ public partial class WardenModel : Node3D
             return;
         }
 
+        float bodyScale = ClassVariant switch
+        {
+            PlayerClass.Nightblade => BodyScaleNightblade,
+            PlayerClass.Revenant => BodyScaleRevenant,
+            _ => BodyScaleWarden,
+        };
         var model = packed.Instantiate();
         // GLTF heroes face +Z; the body -Z faces velocity (FaceMovement) ->
         // turn the model around once inside this wrapper.
         if (model is Node3D root)
         {
             root.RotationDegrees = new Vector3(0f, ModelYawDegrees, 0f);
-            root.Scale = new Vector3(BodyScale, BodyScale, BodyScale);
+            root.Scale = new Vector3(bodyScale, bodyScale, bodyScale);
         }
         AddChild(model);
 
@@ -95,8 +113,15 @@ public partial class WardenModel : Node3D
             _anim.Play(ClipIdle);
         }
 
-        GD.Print("WARDEN MODEL READY — rigged humanoid (CC0 Quaternius), steel retint, sword+shield sockets");
+        GD.Print($"WARDEN MODEL READY — rigged humanoid (CC0 Quaternius), {PlayerClassInfo.Label(ClassVariant)} variant: retint + {WeaponSummary()} sockets");
     }
+
+    private string WeaponSummary() => ClassVariant switch
+    {
+        PlayerClass.Nightblade => "twin daggers",
+        PlayerClass.Revenant => "staff + hood",
+        _ => "sword + shield",
+    };
 
     /// <summary>Steel-plate retint: overrides keep the source albedo/normal/
     /// roughness textures and tint toward the Vision 6.11 palette. All three
@@ -116,16 +141,14 @@ public partial class WardenModel : Node3D
                 case "SuperHero_Male":
                     // Grayscale-luminance shader: the suit texture is warm
                     // tan; only an absolute tint (not a multiply) reads as
-                    // cold plate steel (Vision 6.11).
+                    // the intended material (Vision 6.11).
                     _bodyMaterial = new ShaderMaterial
                     {
                         Shader = GD.Load<Shader>("res://Shaders/steel_limb.gdshader"),
                     };
                     _bodyMaterial.SetShaderParameter("albedo_tex",
                         GD.Load<Texture2D>("res://Godot - UE/T_Superhero_Male_Dark.png"));
-                    _bodyMaterial.SetShaderParameter("tint", EnemyTint
-                        ? new Color(0.42f, 0.46f, 0.54f, 1f)   // cold steel #8a919c direction
-                        : new Color(0.62f, 0.66f, 0.74f, 1f)); // bone-white plate
+                    _bodyMaterial.SetShaderParameter("tint", ClassBodyTint());
                     _bodyMaterial.SetShaderParameter("roughness_v", 0.62f);
                     _bodyMaterial.SetShaderParameter("metallic_v", 0.45f);
                     mi.MaterialOverride = _bodyMaterial;
@@ -146,9 +169,42 @@ public partial class WardenModel : Node3D
         }
     }
 
-    /// <summary>Weapon sockets on the hand bones (Vision 6.8): greatsword on
-    /// the right hand (1.4 m, Vision 6.4), warden shield on the left.</summary>
+    /// <summary>Per-class body tints (Vision 6.11 palette direction): the
+    /// Warden reads as plate, the Nightblade as dark charcoal leather, the
+    /// Revenant as a near-black robe with an arcane cast. Enemies run the
+    /// darker/colder half of each pair.</summary>
+    private Color ClassBodyTint() => (ClassVariant, EnemyTint) switch
+    {
+        (PlayerClass.Warden, false) => new Color(0.62f, 0.66f, 0.74f, 1f),    // bone-white plate
+        (PlayerClass.Warden, true) => new Color(0.42f, 0.46f, 0.54f, 1f),     // cold steel #8a919c
+        (PlayerClass.Nightblade, false) => new Color(0.32f, 0.30f, 0.28f, 1f),// dark leather
+        (PlayerClass.Nightblade, true) => new Color(0.22f, 0.23f, 0.27f, 1f), // darker + cold
+        (PlayerClass.Revenant, false) => new Color(0.26f, 0.21f, 0.30f, 1f),  // dark robe, arcane cast
+        (PlayerClass.Revenant, true) => new Color(0.18f, 0.14f, 0.23f, 1f),
+        _ => new Color(0.62f, 0.66f, 0.74f, 1f),
+    };
+
+    /// <summary>Weapon sockets on the hand bones (Vision 6.8), swapped per
+    /// class: greatsword + shield / twin 0.35 m daggers / staff + hood.</summary>
     private void AttachWeapons(Skeleton3D skeleton)
+    {
+        switch (ClassVariant)
+        {
+            case PlayerClass.Nightblade:
+                AttachTwinDaggers(skeleton);
+                break;
+            case PlayerClass.Revenant:
+                AttachStaffAndHood(skeleton);
+                break;
+            default:
+                AttachSwordAndShield(skeleton);
+                break;
+        }
+    }
+
+    /// <summary>Warden: greatsword on the right hand (1.4 m, Vision 6.4),
+    /// warden shield on the left.</summary>
+    private void AttachSwordAndShield(Skeleton3D skeleton)
     {
         var sword = new BoneAttachment3D { Name = "SwordSocket" };
         skeleton.AddChild(sword);
@@ -203,6 +259,96 @@ public partial class WardenModel : Node3D
         shield.AddChild(boss);
     }
 
+    /// <summary>Nightblade: a 0.35 m dagger in EACH hand (Vision 6.4) — the
+    /// twin-blade silhouette, dark steel so the flash of the swing reads.</summary>
+    private void AttachTwinDaggers(Skeleton3D skeleton)
+    {
+        foreach (var (bone, name) in new[] { ("RightHand", "DaggerSocketR"), ("LeftHand", "DaggerSocketL") })
+        {
+            var socket = new BoneAttachment3D { Name = name };
+            skeleton.AddChild(socket);
+            string? found = FindBone(skeleton, bone);
+            if (found is not null)
+                socket.BoneName = found;
+
+            var blade = new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.045f, 0.28f, 0.012f) },
+                Position = new Vector3(0f, 0.17f, 0.015f),
+                MaterialOverride = MaterialFactory.WeaponSteel(),
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            };
+            var guard = new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.10f, 0.02f, 0.035f) },
+                Position = new Vector3(0f, 0.025f, 0.015f),
+                MaterialOverride = MaterialFactory.DarkStone(),
+            };
+            var grip = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.012f, BottomRadius = 0.012f, Height = 0.11f },
+                RotationDegrees = new Vector3(0f, 0f, 90f),
+                Position = new Vector3(0f, -0.035f, 0.015f),
+                MaterialOverride = MaterialFactory.DarkWood(),
+            };
+            socket.AddChild(blade);
+            socket.AddChild(guard);
+            socket.AddChild(grip);
+        }
+    }
+
+    /// <summary>Revenant: 1.7 m dark staff in the right hand with an arcane
+    /// gem, and a pointed cowl over the head — the hooded silhouette.</summary>
+    private void AttachStaffAndHood(Skeleton3D skeleton)
+    {
+        var staffSocket = new BoneAttachment3D { Name = "StaffSocket" };
+        skeleton.AddChild(staffSocket);
+        string? rightHand = FindBone(skeleton, "RightHand");
+        if (rightHand is not null)
+            staffSocket.BoneName = rightHand;
+
+        var shaft = new MeshInstance3D
+        {
+            Mesh = new CylinderMesh { TopRadius = 0.024f, BottomRadius = 0.03f, Height = 1.7f },
+            Position = new Vector3(0f, 0.55f, 0.03f),
+            MaterialOverride = MaterialFactory.DarkWood(),
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+        };
+        var gem = new MeshInstance3D
+        {
+            Mesh = new SphereMesh { Radius = 0.06f, Height = 0.12f },
+            Position = new Vector3(0f, 1.42f, 0.03f),
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.42f, 0.29f, 0.54f, 1f),   // arcane (Vision 6.11)
+                EmissionEnabled = true,
+                Emission = new Color(0.42f, 0.29f, 0.54f, 1f),
+                EmissionEnergyMultiplier = 1.8f,
+                Roughness = 0.3f,
+            },
+        };
+        staffSocket.AddChild(shaft);
+        staffSocket.AddChild(gem);
+
+        var hood = new BoneAttachment3D { Name = "HoodSocket" };
+        skeleton.AddChild(hood);
+        string? head = FindBone(skeleton, "Head");
+        if (head is not null)
+            hood.BoneName = head;
+        var cowl = new MeshInstance3D
+        {
+            Mesh = new CylinderMesh { TopRadius = 0.09f, BottomRadius = 0.20f, Height = 0.34f },
+            Position = new Vector3(0f, 0.06f, -0.02f),
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(0.16f, 0.13f, 0.19f, 1f),   // near-black cloth
+                Roughness = 0.95f,
+            },
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+        };
+        hood.AddChild(cowl);
+    }
+
     private static string? FindBone(Skeleton3D skeleton, string name)
     {
         for (int i = 0; i < skeleton.GetBoneCount(); i++)
@@ -242,12 +388,20 @@ public partial class WardenModel : Node3D
         }
     }
 
-    /// <summary>Sword arc swing (WardenChain calls per chain step).</summary>
-    public void PlayAttack()
+    /// <summary>Class attack clip (WardenChain calls per chain step): the
+    /// Warden swings Sword_Attack, the Nightblade stabs with the punch clips
+    /// (daggers read as short stabs), the Revenant casts.</summary>
+    public void PlayAttack(int chainIndex = 0)
     {
         if (_dead || _anim is null)
             return;
-        StartOneShot(ClipAttack);
+        string clip = ClassVariant switch
+        {
+            PlayerClass.Nightblade => chainIndex >= 2 ? Lib + "Punch_Cross" : Lib + "Punch_Jab",
+            PlayerClass.Revenant => Lib + "Spell_Simple_Shoot",
+            _ => Lib + "Sword_Attack",
+        };
+        StartOneShot(clip);
     }
 
     /// <summary>Dodge roll clip; i-frames live in the controller.</summary>
@@ -269,6 +423,19 @@ public partial class WardenModel : Node3D
         StartOneShot(ClipHit);
     }
 
+    /// <summary>Stealth ghost (Vision 7 nightblade): body fades to a dark
+    /// shimmer while stealthed; the death fade folds it back in.</summary>
+    public void SetGhost(float alpha)
+    {
+        _ghostAlpha = Mathf.Clamp(alpha, 0.05f, 1f);
+        if (!_dead)
+        {
+            _bodyMaterial?.SetShaderParameter("alpha_v", _ghostAlpha);
+            foreach (var mat in _fadeMaterials)
+                mat.AlbedoColor = new Color(mat.AlbedoColor, _ghostAlpha);
+        }
+    }
+
     /// <summary>Death01 one-shot; the pose freezes and the body fades.</summary>
     public void PlayDeath(float fadeAlpha)
     {
@@ -281,7 +448,7 @@ public partial class WardenModel : Node3D
             _anim.Play(ClipDeath);
             _anim.SpeedScale = 1f;
         }
-        float a = Mathf.Clamp(1f - fadeAlpha, 0.15f, 1f);
+        float a = Mathf.Clamp(1f - fadeAlpha, 0.15f, 1f) * _ghostAlpha;
         _bodyMaterial?.SetShaderParameter("alpha_v", a);
         foreach (var mat in _fadeMaterials)
             mat.AlbedoColor = new Color(mat.AlbedoColor, a);
@@ -293,6 +460,7 @@ public partial class WardenModel : Node3D
         _dead = false;
         _oneshot = null;
         _locomotionClip = ClipIdle;
+        _ghostAlpha = 1f;
         _bodyMaterial?.SetShaderParameter("alpha_v", 1f);
         foreach (var mat in _fadeMaterials)
             mat.AlbedoColor = new Color(mat.AlbedoColor, 1f);

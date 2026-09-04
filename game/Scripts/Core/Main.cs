@@ -1,5 +1,7 @@
 using Godot;
+using Hollowcrown.Combat;
 using Hollowcrown.Networking;
+using Hollowcrown.Player;
 using Hollowcrown.UI;
 using Hollowcrown.World;
 
@@ -55,6 +57,12 @@ public partial class Main : Node3D
             else if (args[i] == "--password" && i + 1 < args.Length)
             {
                 joinPassword = args[++i];
+            }
+            else if (args[i] == "--class" && i + 1 < args.Length)
+            {
+                // Class selection for automated runs (Vision 7); the UI flow
+                // picks the class via the selected character card.
+                PlayerController.PendingClass = PlayerClassInfo.FromId(args[++i]);
             }
         }
 

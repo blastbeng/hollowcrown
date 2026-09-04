@@ -238,13 +238,15 @@ public partial class ArenaTest : Node3D
 
     private void BuildPlayer()
     {
-        // Player controller owns the 1.8 m capsule visual now (Vision 6.4):
-        // WASD camera-relative, sprint, dodge roll. Camera + occluder
-        // TargetPaths keep pointing at this same node.
-        _player = new PlayerController { Name = "Player" };
+        // Player controller owns the rigged class model (Vision 6.4/6.8):
+        // WASD camera-relative, sprint, dodge roll, class kit. The class
+        // comes from the boot flow (Main: character select / --class flag).
+        _player = new PlayerController
+        {
+            Name = "Player",
+            Class = PlayerController.PendingClass,
+        };
         _player.Position = new Vector3(0, 0.2f, -2);
-        _player.AddChild(new WardenChain { Name = "WardenChain" });   // Vision 7 slice: Q/LMB sword chain
-        _player.AddChild(new WardenKit { Name = "WardenKit" });       // Vision 7: E bash, R warcry, F wall
         AddChild(_player);
     }
 

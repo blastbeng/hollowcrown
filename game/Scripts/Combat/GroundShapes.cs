@@ -34,6 +34,29 @@ public static class GroundShapes
         return st.Commit();
     }
 
+    /// <summary>Flat rectangle strip from origin toward <paramref name="facing"/>
+    /// (length x width). Used for line hitboxes (nightblade smoke trail,
+    /// revenant bone spear) and VFX flashes.</summary>
+    public static ArrayMesh Line(float length, float width, Vector3 facing)
+    {
+        float baseYaw = Mathf.Atan2(-facing.X, -facing.Z);   // body-style yaw
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        var halfW = new Vector3(width * 0.5f, 0f, 0f);
+        // Local frame: -Z forward, +X right, then rotated by baseYaw.
+        var fwd = PointAt(baseYaw, length);
+        var right = new Vector3(Mathf.Cos(baseYaw), 0f, -Mathf.Sin(baseYaw));
+        var a = right * -halfW.Length();
+        var b = right * halfW.Length();
+        st.SetNormal(Vector3.Up); st.AddVertex(a);
+        st.SetNormal(Vector3.Up); st.AddVertex(fwd + b);
+        st.SetNormal(Vector3.Up); st.AddVertex(fwd + a);
+        st.SetNormal(Vector3.Up); st.AddVertex(a);
+        st.SetNormal(Vector3.Up); st.AddVertex(b);
+        st.SetNormal(Vector3.Up); st.AddVertex(fwd + b);
+        return st.Commit();
+    }
+
     private static Vector3 PointAt(float yaw, float radius)
         => new Vector3(-Mathf.Sin(yaw), 0f, -Mathf.Cos(yaw)) * radius;   // forward = -Z
 }

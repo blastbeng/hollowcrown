@@ -112,6 +112,11 @@ public partial class TrainingDummy : StaticBody3D, ICombatTarget
         GD.Print($"TRAINING DUMMY STUNNED {seconds:0.00}s (authority)");
     }
 
+    public void OnStealthed(bool stealthed)
+    {
+        // Static targets can't stealth.
+    }
+
     public void OnKilled()
     {
         IsDead = true;

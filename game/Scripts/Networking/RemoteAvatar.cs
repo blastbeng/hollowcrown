@@ -18,6 +18,10 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
     public int PeerId { get; set; }
     public string DisplayName { get; set; } = "Warden";
 
+    /// <summary>Class id from the realm handshake — picks the enemy model
+    /// variant (twin daggers, staff + hood) so classes read at iso zoom.</summary>
+    public string ClassId { get; set; } = "warden";
+
     public int MaxHp => CombatAuthority.PlayerMaxHp;
     public int Hp { get; private set; }
     public bool IsDead { get; private set; }
@@ -41,9 +45,14 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
         Hp = MaxHp;
 
         _visual = new Node3D { Name = "Visual" };
-        // Rigged enemy warden (Vision 6.8): same class model, colder steel so
+        // Rigged enemy model (Vision 6.8): same class pipeline, colder tint so
         // friend vs foe reads at iso zoom. The capsule stand-in is retired.
-        _model = new WardenModel { Name = "Model", EnemyTint = true };
+        _model = new WardenModel
+        {
+            Name = "Model",
+            EnemyTint = true,
+            ClassVariant = PlayerClassInfo.FromId(ClassId),
+        };
         _visual.AddChild(_model);
         AddChild(_visual);
 
@@ -60,7 +69,7 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
         _nameplate.Modulate = new Color("c0392b").Lerp(new Color("7a1414"), 0.5f);
         AddChild(_nameplate);
 
-        GD.Print($"REMOTE AVATAR READY — {DisplayName} (rigged enemy model, red nameplate)");
+        GD.Print($"REMOTE AVATAR READY — {DisplayName} ({PlayerClassInfo.Label(PlayerClassInfo.FromId(ClassId))} model, red nameplate)");
     }
 
     /// <summary>Authority-relayed state (10 Hz): the puppet lerps to it.</summary>
@@ -125,6 +134,12 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
     }
 
     public void OnStunned(float seconds) { /* stun visual lands with PvP polish */ }
+
+    public void OnStealthed(bool stealthed)
+    {
+        // Stealthed enemy puppets ghost too — invisibility reads on screen.
+        _model?.SetGhost(stealthed ? 0.35f : 1f);
+    }
 
     public void OnKilled()
     {

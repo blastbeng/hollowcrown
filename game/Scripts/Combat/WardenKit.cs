@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 using Hollowcrown.Core;
 using Hollowcrown.Networking;
 using Hollowcrown.Player;
@@ -16,7 +17,7 @@ namespace Hollowcrown.Combat;
 /// are computed server-side by CombatAuthority (CombatTables); this node
 /// draws the VFX, gates its own costs/cooldowns, and requests the hits.
 /// </summary>
-public partial class WardenKit : Node3D
+public partial class WardenKit : Node3D, IAbilityProvider
 {
     // --- Shield bash (BALANCE.md: warden_bash) ---
     [Export] public float BashRadius = 3.2f;
@@ -43,6 +44,16 @@ public partial class WardenKit : Node3D
     /// <summary>Remaining cooldowns for the HUD (ArenaHud.cs sweeps).</summary>
     public float BashCdRemaining => Mathf.Max(0f, _bashCd);
     public float WarcryCdRemaining => Mathf.Max(0f, _warcryCd);
+
+    public IEnumerable<AbilitySlot> Slots()
+    {
+        yield return new AbilitySlot("E", "Bash",
+            () => BashCdRemaining / BashCooldown, () => false);
+        yield return new AbilitySlot("R", "Warcry",
+            () => WarcryCdRemaining / WarcryCooldown, () => false);
+        yield return new AbilitySlot("F", "Wall",
+            () => 0f, () => _pc.IsShieldWalling);
+    }
 
     public override void _Ready()
     {

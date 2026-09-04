@@ -19,7 +19,6 @@ public partial class ArenaHud : CanvasLayer
     private const float TargetRange = 5.5f;
 
     private PlayerController _pc = null!;
-    private WardenKit _kit = null!;
     private ProgressBar _hpBar = null!;
     private Label _hpText = null!;
     private ProgressBar _staminaBar = null!;
@@ -45,9 +44,6 @@ public partial class ArenaHud : CanvasLayer
     public override void _Ready()
     {
         _pc = GetNode<PlayerController>(PlayerPath);
-        foreach (var child in _pc.GetChildren())
-            if (child is WardenKit kit)
-                _kit = kit;
 
         var root = new Control
         {
@@ -57,17 +53,20 @@ public partial class ArenaHud : CanvasLayer
         root.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         AddChild(root);
 
-        BuildAbilityBar(root);
+        // Class-agnostic ability bar (Vision 6.10): whichever kit nodes the
+        // player carries (WardenChain/WardenKit, NightbladeChain/NightbladeKit)
+        // provide their own slots — the HUD never hardcodes a class.
+        BuildBarsAndSlots(root);
         BuildTargetFrame(root);
         BuildKillFeed(root);
         if (CombatAuthority.For(this) is { } auth)
             auth.KillFeed += AddKillFeed;   // server-broadcast killfeed
-        GD.Print("ARENA HUD READY — ability bar (Q/E/R/F sweeps), stamina, target frame, killfeed");
+        GD.Print($"ARENA HUD READY — {_slots.Count} ability slots, stamina, target frame, killfeed");
     }
 
     // ------------------------------ Ability bar ---------------------------
 
-    private void BuildAbilityBar(Control root)
+    private void BuildBarsAndSlots(Control root)
     {
         var column = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         column.AnchorLeft = 0.5f; column.AnchorRight = 0.5f;
@@ -138,16 +137,13 @@ public partial class ArenaHud : CanvasLayer
         bar.AddThemeConstantOverride("separation", 8);
         column.AddChild(bar);
 
-        bar.AddChild(MakeSlot("Q", "Chain", () => 0f, () => false));
-        bar.AddChild(MakeSlot("E", "Bash",
-            () => _kit is null ? 0f : _kit.BashCdRemaining / _kit.BashCooldown,
-            () => false));
-        bar.AddChild(MakeSlot("R", "Warcry",
-            () => _kit is null ? 0f : _kit.WarcryCdRemaining / _kit.WarcryCooldown,
-            () => false));
-        bar.AddChild(MakeSlot("F", "Wall",
-            () => 0f,
-            () => _pc.IsShieldWalling));
+        foreach (var child in _pc.GetChildren())
+        {
+            if (child is not IAbilityProvider provider)
+                continue;
+            foreach (var slot in provider.Slots())
+                bar.AddChild(MakeSlot(slot.Key, slot.Name, slot.CdFraction, slot.Active));
+        }
     }
 
     private Control MakeSlot(string keyLabel, string abilityName,

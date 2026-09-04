@@ -33,6 +33,10 @@ public interface ICombatTarget
     /// <summary>Authority broadcast: control effect (stun) applied.</summary>
     void OnStunned(float seconds);
 
+    /// <summary>Authority broadcast: stealth state changed (nightblade).
+    /// Targets that can't stealth ignore it.</summary>
+    void OnStealthed(bool stealthed);
+
     /// <summary>Authority broadcast: HP reached zero — death visuals.</summary>
     void OnKilled();
 

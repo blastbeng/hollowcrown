@@ -42,6 +42,26 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 | wall_drain    | 25/s     | stamina; wall ends at empty or 2 s      |
 | inputs        | E / R / F| Vision 1 lists QWER but W is movement — skills bind Q / E / R / F |
 
+## Nightblade kit (Vision 7 kit slice; NightbladeChain.cs + NightbladeKit.cs)
+| name           | value     | notes                                        |
+|----------------|-----------|----------------------------------------------|
+| chain_damage   | 14/14/28  | fast 3-hit stab chain; finisher heavier       |
+| chain_reach    | 2.0 m     | shorter than the warden arc                   |
+| chain_arc      | 100 deg   | tight twin-dagger sector                      |
+| combo_window   | 0.7 s     | faster chain rhythm                           |
+| full_chain     | 56 dmg    | vs warden 75 — speed over burst               |
+| min_interval   | 0.18/0.18/0.35 s | server anti-spam floor per swing       |
+| attack_inputs  | Q / LMB   | action "attack"                               |
+| shadow_step    | E         | 6 m blink toward cursor                       |
+| step_cost      | 15        | stamina; cooldown 8 s                         |
+| stealth        | R         | 5 s ghost, breaks on attack, next hit +50%    |
+| stealth_cd     | 12 s      | server-enforced per peer                      |
+| smoke_bomb     | F         | radius 3.5 m, 6 s, throws to cursor (10 m)    |
+| smoke_cost     | 25        | stamina; cooldown 8 s (server-enforced)       |
+| smoke_blind    | server    | hits out of/through the cloud are REJECTED    |
+| stealth_bonus  | x1.50     | applied server-side on the breaking hit       |
+| nightblade_model | 1.80 m  | BodyScale 1.12 — slim twin-dagger silhouette  |
+
 ## Training dummy (TrainingDummy.cs — combat verification target)
 | name         | value | notes                            |
 |--------------|-------|----------------------------------|
