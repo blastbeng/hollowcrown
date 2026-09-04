@@ -67,6 +67,8 @@ public partial class WardenChain : Node3D
         // No swinging while down or authority-stunned (Vision 7 control rules).
         if (_body is PlayerController pc && (pc.IsDead || pc.IsStunned))
             return;
+        if (_body is PlayerController attacker)
+            attacker.PlayAttackAnim();         // rigged Sword_Attack clip (Vision 6.8)
 
         Vector3 aim = Aim.CursorGroundPoint(_cam!);
         var toAim = aim - _body.GlobalPosition;

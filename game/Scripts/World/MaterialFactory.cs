@@ -50,4 +50,8 @@ public static class MaterialFactory
     public static StandardMaterial3D DarkStone() => Get("dark_stone", Color.FromHtml("808088"), 0.8f, uvScale: 3f);
     public static StandardMaterial3D RubbleStone() => Get("rubble_stone", Color.FromHtml("9a9aa0"), 0.9f, uvScale: 1f);
     public static StandardMaterial3D DarkWood() => Get("dark_wood", Color.FromHtml("6a5540"), 0.85f, uvScale: 1f);
+    /// <summary>Warden weapon sockets (Vision 6.8): cold steel blade + shield
+    /// boss, forged plate shield face. Palette 6.11: cold steel #8a919c.</summary>
+    public static StandardMaterial3D WeaponSteel() => Get("weapon_steel", Color.FromHtml("d8dde6"), 0.35f, metallic: 0.65f, uvScale: 1f);
+    public static StandardMaterial3D ArmorPlate() => Get("armor_plate", Color.FromHtml("b0b4bc"), 0.55f, metallic: 0.3f, uvScale: 2f);
 }

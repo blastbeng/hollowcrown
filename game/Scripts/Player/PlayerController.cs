@@ -8,9 +8,8 @@ namespace Hollowcrown.Player;
 /// <summary>
 /// Player controller (Vision 1 / 6.8 / 7): WASD movement RELATIVE TO THE ISO
 /// CAMERA YAW (rig never free-rotates), sprint on stamina, dodge roll on
-/// Space with a 0.3 s i-frame window (Vision 7), procedural silhouette
-/// animation (bob / lean / roll) with hook points a real AnimationPlayer can
-/// replace later (Vision 6.8: "SOMETHING must move").
+/// Space with a 0.3 s i-frame window (Vision 7), rig plays the class model
+/// (WardenModel: rigged Quaternius humanoid + real clips per Vision 6.8).
 /// Tunables are recorded in BALANCE.md; server-authoritative combat lands
 /// with the combat core task and will consume IsInvulnerable.
 /// </summary>
@@ -62,6 +61,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
             return;
         Hp = hpAfter;
         DamageNumber.Spawn(this, GlobalPosition, amount, heavy);
+        _model?.PlayHit();                     // rigged hit reaction (Vision 6.8)
     }
 
     /// <summary>Authority-broadcast stun (shield bash): movement locked while
@@ -87,9 +87,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     {
         IsDead = false;
         Hp = hpAfter;
-        _visualRoot.RotationDegrees = Vector3.Zero;
-        _visualRoot.Position = Vector3.Zero;
-        _capsule.Transparency = 0f;
+        _model?.ResetPose();
         GlobalPosition = spawnPos;
         Velocity = Vector3.Zero;
         GD.Print($"WARDEN RESPAWNED ({DisplayName}) at {spawnPos} (authority)");
@@ -102,32 +100,24 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     private float _warcryTimer;
     private float _warcryMultiplier = 1f;
 
-    // --- Animation hooks (Vision 6.8): swap for a real AnimationPlayer. ---
-    [Signal] public delegate void FootstepEventHandler();
-    [Signal] public delegate void DodgeStartedEventHandler();
-
-    private Node3D _visualRoot = null!;   // pivot for bob/lean/roll
-    private MeshInstance3D _capsule = null!;
+    // --- Rigged class model (Vision 6.8): real clips, retinted, weapon sockets.
+    private Node3D _visualRoot = null!;   // presentation pivot (model child)
+    private WardenModel? _model;
     private float _dodgeTimer, _dodgeCdTimer, _staminaIdleTimer;
-    private float _bobPhase, _bobLastSin;
     private Vector3 _lastMoveDir = Vector3.Forward;
     private Vector3 _dodgeDir;
-    private Vector3 _rollAxisLocal;   // tumble axis in body space, frozen at dodge start
-    private static readonly Vector3 CapsuleCenter = new(0f, 0.9f, 0f);  // 1.8 m capsule mid-height
     private Camera3D? _cam;
+
+    /// <summary>WardenChain calls this on every swing step so the greatsword
+    /// arc on the model matches the ground-projected hitbox flash.</summary>
+    public void PlayAttackAnim() => _model?.PlayAttack();
 
     public override void _Ready()
     {
-        // 1.8 m capsule stand-in (Vision 6.4) with the steel tint; the real
-        // rigged class model replaces this child in the character task.
+        // Rigged Warden model (Vision 6.8): the capsule stand-in is retired.
         _visualRoot = new Node3D { Name = "VisualRoot" };
-        _capsule = new MeshInstance3D
-        {
-            Mesh = new CapsuleMesh { Radius = 0.35f, Height = 1.8f },
-            MaterialOverride = MaterialFactory.PlayerAccent(),  // bone accent: silhouette reads vs floor (Vision 6.8)
-            Position = new Vector3(0f, 0.9f, 0f),
-        };
-        _visualRoot.AddChild(_capsule);
+        _model = new WardenModel { Name = "WardenModel" };
+        _visualRoot.AddChild(_model);
         AddChild(_visualRoot);
 
         AddChild(new CollisionShape3D
@@ -172,7 +162,6 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         if (IsDodging)
         {
             Velocity = _dodgeDir * DodgeSpeed;    // burst, no steering
-            AnimateDodgeSpin(delta);
         }
         else
         {
@@ -195,18 +184,16 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         MoveAndSlide();
     }
 
-    /// <summary>Death presentation: pitch over with a slight lift so the lying
-    /// capsule rests ON the floor (rotation about the feet would half-bury it),
-    /// then fade. Respawn resets pose and position (authority-broadcast).</summary>
+    /// <summary>Death presentation: the rigged Death01 clip plays once and the
+    /// body fades toward the respawn (authority-broadcast). Nothing else moves
+    /// while down.</summary>
     private void UpdateDeathVisual(float delta)
     {
         if (_fallTimer > 0f)
         {
             _fallTimer -= delta;
             float t = 1f - Mathf.Max(0f, _fallTimer) / FallDuration;
-            _visualRoot.RotationDegrees = new Vector3(90f * t, 0, 0);
-            _visualRoot.Position = new Vector3(0, 0.35f * t, 0);
-            _capsule.Transparency = t * 0.6f;
+            _model?.PlayDeath(t);
         }
     }
 
@@ -235,14 +222,10 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         Stamina -= DodgeCost;
         _staminaIdleTimer = StaminaRegenDelay;
         _dodgeDir = _lastMoveDir;
-        var axisWorld = Vector3.Up.Cross(_dodgeDir);
-        if (axisWorld.LengthSquared() < 0.001f)
-            axisWorld = Vector3.Right;
-        _rollAxisLocal = GlobalBasis.Inverse() * axisWorld.Normalized();
         _dodgeTimer = DodgeDuration;
         _dodgeCdTimer = DodgeCooldown;
         IsDodging = true;
-        EmitSignal(SignalName.DodgeStarted);   // animation hook
+        _model?.PlayRoll(DodgeDuration);       // rigged roll clip (Vision 6.8)
     }
 
     private void UpdateDodgeTimers(float delta)
@@ -255,8 +238,6 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         if (_dodgeTimer <= 0f)
         {
             IsDodging = false;
-            _visualRoot.Basis = Basis.Identity;          // end the roll pose
-            _visualRoot.Position = Vector3.Zero;         // restore bob pivot
         }
     }
 
@@ -331,49 +312,13 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
                 1f - Mathf.Exp(-TurnRate * delta))), 0f);
     }
 
-    // ---------------- Procedural animation (Vision 6.8 fallback) ----------
+    // ---------------- Rigged model locomotion (Vision 6.8) ----------------
 
     private void AnimateLocomotion(float delta)
     {
-        float speed = Velocity.Length();
-        if (IsOnFloor() && speed > 0.5f)
-        {
-            _bobPhase += delta * speed * 2.6f;       // stride frequency
-            float s = Mathf.Sin(_bobPhase);
-            _visualRoot.Position = new Vector3(0f, 0.06f * Mathf.Abs(s), 0f);
-            _visualRoot.RotationDegrees = new Vector3(0f, 0f, 4f * s); // sway
-            // Lean into the direction of travel (silhouette readability):
-            // pitch forward, scaled by speed (body yaw already faces travel).
-            _visualRoot.RotationDegrees = new Vector3(
-                Mathf.Min(10f, speed * 1.1f),
-                _visualRoot.RotationDegrees.Y,
-                4f * s);
-            if (_bobLastSin * s < 0f)                // zero crossing = step
-                EmitSignal(SignalName.Footstep);
-            _bobLastSin = s;
-        }
-        else
-        {
-            _visualRoot.Position = _visualRoot.Position.Lerp(Vector3.Zero,
-                1f - Mathf.Exp(-10f * delta));
-            _visualRoot.RotationDegrees = _visualRoot.RotationDegrees.Lerp(
-                Vector3.Zero, 1f - Mathf.Exp(-10f * delta));
-            _bobLastSin = 0f;
-        }
-    }
-
-    private void AnimateDodgeSpin(float delta)
-    {
-        // Roll around the capsule CENTER (0.9 m up), not the feet: pivoting at
-        // the feet orbits the capsule 0.9 m INTO the floor at 180 deg (caught
-        // by the playtester visual gate). Composite local transform =
-        // rotation R about the center c:  p -> c + R*(p - c)  =>  T = R,
-        // origin = c - R*c.  Axis is frozen in body space (yaw is locked
-        // while dodging), so the tumble reads as a forward roll.
-        float t = Mathf.Clamp(1f - _dodgeTimer / DodgeDuration, 0f, 1f);
-        var r = new Basis(_rollAxisLocal, Mathf.Lerp(0f, Mathf.Tau, t));
-        _visualRoot.Basis = r;
-        _visualRoot.Position = CapsuleCenter - r * CapsuleCenter;
+        // Real clips (Idle / Walk / Jog_Fwd) scale their stride to the actual
+        // velocity; the model handles its own bob/footfall.
+        _model?.PlayLocomotion(Velocity.Length(), IsSprinting);
     }
 
     /// <summary>Rich state for the playtester runtime digest (mcp_watch).</summary>
