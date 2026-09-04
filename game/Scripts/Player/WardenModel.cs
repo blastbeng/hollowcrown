@@ -18,15 +18,18 @@ public partial class WardenModel : Node3D
     private const string PackScene = "res://addons/quaternius_ik_rigged/Models_with_rigging/Male_rigged.tscn";
     private const string Lib = "UAL1_Standard/";
 
-    // Runtime-calibrated against the 1.8 m spec (Vision 6.4).
-    private const float BodyScale = 1.06f;
+    // Runtime-calibrated: head bone at 1.61 m natural -> 1.15 puts the head
+    // at ~1.85 m (Vision 6.4 character = 1.8 m) and the greatsword at ~1.44 m.
+    private const float BodyScale = 1.15f;
     // The glTF model faces +Z; the controller's body -Z faces velocity, so
     // the model wrapper turns around once. Verified against movement.
     private const float ModelYawDegrees = 180f;
 
     // Palette (Vision 6.11): cold steel armor, bone trim, dark leather straps.
-    private static readonly Color ArmorTint = new(0.88f, 0.90f, 0.94f);
-    private static readonly Color TrimTint = new(0.74f, 0.62f, 0.45f);
+    // The suit texture is warm tan — the blue-gray tint must be strong enough
+    // to pull it to plate steel on screen.
+    private static readonly Color ArmorTint = new(0.60f, 0.66f, 0.80f);
+    private static readonly Color TrimTint = new(0.58f, 0.50f, 0.36f);
 
     private const string ClipIdle = Lib + "Idle";
     private const string ClipWalk = Lib + "Walk";
@@ -55,7 +58,10 @@ public partial class WardenModel : Node3D
         // GLTF heroes face +Z; the body -Z faces velocity (FaceMovement) ->
         // turn the model around once inside this wrapper.
         if (model is Node3D root)
+        {
             root.RotationDegrees = new Vector3(0f, ModelYawDegrees, 0f);
+            root.Scale = new Vector3(BodyScale, BodyScale, BodyScale);
+        }
         AddChild(model);
 
         // IK helper nodes (influence 0) and their markers are inert in
@@ -109,8 +115,8 @@ public partial class WardenModel : Node3D
                     mat.NormalTexture = GD.Load<Texture2D>("res://Godot - UE/T_Superhero_Male_Normal.png");
                     mat.RoughnessTexture = GD.Load<Texture2D>("res://Godot - UE/T_Superhero_Male_Roughness.png");
                     mat.AlbedoColor = new Color(ArmorTint, 1f);
-                    mat.Metallic = 0.25f;
-                    mat.Roughness = 0.72f;
+                    mat.Metallic = 0.4f;
+                    mat.Roughness = 0.66f;
                     break;
                 case "Eyes":
                     mat.AlbedoTexture = GD.Load<Texture2D>("res://Godot - UE/T_Eye_Brown.png");
