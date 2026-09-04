@@ -169,6 +169,14 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         GD.Print($"PLAYER CONTROLLER READY — {PlayerClassInfo.Label(Class)}: WASD camera-relative, sprint, dodge roll (0.3 s i-frames)");
     }
 
+    public override void _ExitTree()
+    {
+        // A freed player must not stay in the authority's world (stale target
+        // would eat validation results).
+        if (CombatId > 0)
+            CombatAuthority.For(this)?.Unregister(CombatId);
+    }
+
     public override void _PhysicsProcess(double deltaRaw)
     {
         float delta = (float)deltaRaw;
