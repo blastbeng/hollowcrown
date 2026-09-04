@@ -78,6 +78,9 @@ public partial class Main : Node3D
 
         if (joinHost.Length > 0)
         {
+            // The handshake declares the class (server names the peer + every
+            // peer spawns the right enemy model variant).
+            CombatAuthority.PendingClass = PlayerClassInfo.Id(PlayerController.PendingClass);
             JoinRealm(joinHost, joinPort, joinPassword);
             return;
         }
