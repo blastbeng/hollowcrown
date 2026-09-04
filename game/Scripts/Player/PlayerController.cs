@@ -205,15 +205,17 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         bool stunned = _stunTimer > 0f;
         if (stunned)
             _stunTimer -= delta;
+        if (_rootTimer > 0f)
+            _rootTimer -= delta;
 
         UpdateStamina(delta);
         UpdateDodgeTimers(delta);
-        if (!stunned)
+        if (!stunned && !IsRooted)
             HandleDodgeInput();
         UpdateBuffTimers(delta);
         UpdateBlindOverlay();
 
-        var input = stunned
+        var input = (stunned || IsRooted)
             ? Vector2.Zero
             : Input.GetVector("move_left", "move_right", "move_forward", "move_back");
         var moveDir = CameraRelative(input);
