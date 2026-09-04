@@ -141,6 +141,11 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
         _model?.SetGhost(stealthed ? 0.35f : 1f);
     }
 
+    public void OnRooted(float seconds)
+    {
+        // Root visual lands with PvP polish; the server keeps the timer.
+    }
+
     public void OnKilled()
     {
         IsDead = true;

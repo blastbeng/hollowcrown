@@ -117,6 +117,11 @@ public partial class TrainingDummy : StaticBody3D, ICombatTarget
         // Static targets can't stealth.
     }
 
+    public void OnRooted(float seconds)
+    {
+        // Static targets can't be rooted.
+    }
+
     public void OnKilled()
     {
         IsDead = true;

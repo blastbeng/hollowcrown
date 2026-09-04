@@ -62,6 +62,18 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 | stealth_bonus  | x1.50     | applied server-side on the breaking hit       |
 | nightblade_model | 1.80 m  | BodyScale 1.12 — slim twin-dagger silhouette  |
 
+## Revenant kit, slice 1 (Vision 7; RevenantChain.cs + RevenantKit.cs)
+| name           | value    | notes                                          |
+|----------------|----------|------------------------------------------------|
+| bone_spear     | Q        | 18 dmg, 9 m x 1.2 m ground LINE (line hitbox)  |
+| spear_shape    | instant  | line applies on cast; bolt visual travels 0.35 s |
+| spear_cooldown | 5 s      | server floor 4.5 s                             |
+| grave_grasp    | E        | 6 dmg + 1.0 s ROOT, 4.5 m circle at the cursor |
+| grasp_cost     | 20       | stamina; cooldown 9 s (server floor 8.5 s)     |
+| root_semantics | 1.0 s    | rooted cannot move/dodge, CAN still fight      |
+| revenant_model | 1.85 m   | staff + hood variant (in WardenModel pipeline) |
+| slice 2        | R + F    | life drain (channel line) + soul ward (absorb) |
+
 ## Training dummy (TrainingDummy.cs — combat verification target)
 | name         | value | notes                            |
 |--------------|-------|----------------------------------|

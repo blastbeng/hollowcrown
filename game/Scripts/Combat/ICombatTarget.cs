@@ -33,6 +33,10 @@ public interface ICombatTarget
     /// <summary>Authority broadcast: control effect (stun) applied.</summary>
     void OnStunned(float seconds);
 
+    /// <summary>Authority broadcast: root applied (cannot move, CAN still
+    /// fight — unlike stun).</summary>
+    void OnRooted(float seconds);
+
     /// <summary>Authority broadcast: stealth state changed (nightblade).
     /// Targets that can't stealth ignore it.</summary>
     void OnStealthed(bool stealthed);

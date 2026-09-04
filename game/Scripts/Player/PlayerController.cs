@@ -58,12 +58,13 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     public int Hp { get; private set; }
     public bool IsDead { get; private set; }
     public bool IsStunned => _stunTimer > 0f;
+    public bool IsRooted => _rootTimer > 0f;   // cannot move, CAN still fight
     public int CombatId => PeerId;
     public Vector3 CombatPosition => GlobalPosition;
     public string DisplayName => $"{PlayerClassInfo.Label(Class)}#{PeerId}";
 
     private const float FallDuration = 0.45f;
-    private float _stunTimer, _fallTimer;
+    private float _stunTimer, _fallTimer, _rootTimer;
 
     public void OnHitApplied(int amount, bool heavy, int hpAfter)
     {
@@ -91,6 +92,16 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         IsStealthed = stealthed;
         _model?.SetGhost(stealthed ? 0.35f : 1f);
         GD.Print($"{PlayerClassInfo.Label(Class)} STEALTH {(stealthed ? "ON (ghosted)" : "OFF")}");
+    }
+
+    /// <summary>Authority-broadcast root (grave grasp): movement locked,
+    /// combat still allowed (unlike stun).</summary>
+    public void OnRooted(float seconds)
+    {
+        if (IsDead || seconds <= 0f)
+            return;
+        _rootTimer = Mathf.Max(_rootTimer, seconds);
+        GD.Print($"{PlayerClassInfo.Label(Class).ToUpperInvariant()} ROOTED {seconds:0.00}s (authority)");
     }
 
     public void OnKilled()
@@ -148,6 +159,10 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
             case PlayerClass.Nightblade:
                 AddChild(new NightbladeChain { Name = "Chain" });
                 AddChild(new NightbladeKit { Name = "Kit" });
+                break;
+            case PlayerClass.Revenant:
+                AddChild(new RevenantChain { Name = "Chain" });
+                AddChild(new RevenantKit { Name = "Kit" });
                 break;
             default:
                 AddChild(new WardenChain { Name = "Chain" });
@@ -397,6 +412,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         ["peer_id"] = PeerId,
         ["class"] = PlayerClassInfo.Label(Class),
         ["stealthed"] = IsStealthed,
+        ["rooted"] = IsRooted,
         ["stamina"] = Stamina,
         ["sprinting"] = IsSprinting,
         ["dodging"] = IsDodging,

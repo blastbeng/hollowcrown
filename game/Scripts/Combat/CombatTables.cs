@@ -18,13 +18,23 @@ public enum AttackId
     DaggerLight = 5,   // nightblade chain, stab 1
     DaggerMid = 6,     // nightblade chain, stab 2
     DaggerFinisher = 7,// nightblade chain, heavy finisher
+    BoneSpear = 8,     // revenant kit, Q — ground-line projectile
+    GraveGrasp = 9,    // revenant kit, E — root circle
+}
+
+public enum AttackShape
+{
+    Arc,    // sector centered on the attacker (warden/nightblade)
+    Line,   // strip from the attacker toward the aim point (bone spear)
 }
 
 public static class CombatTables
 {
     public readonly record struct Attack(
         int Damage, bool Heavy, float Range, float ArcDegrees,
-        float StunSeconds, float MinInterval);
+        float StunSeconds, float MinInterval,
+        AttackShape Shape = AttackShape.Arc, float Width = 0f,
+        float RootSeconds = 0f);
 
     // BALANCE.md: warden_chain (20/20/35, 2.4 m, 120 deg), warden_bash
     // (15, 3.2 m, 90 deg, 0.5 s stun, 6 s cd). MinInterval is the server's
@@ -40,6 +50,13 @@ public static class CombatTables
         [(int)AttackId.DaggerLight] = new(14, false, 2.0f, 100f, 0f, 0.18f),
         [(int)AttackId.DaggerMid] = new(14, false, 2.0f, 100f, 0f, 0.18f),
         [(int)AttackId.DaggerFinisher] = new(28, true, 2.0f, 100f, 0f, 0.35f),
+        // BALANCE.md: revenant_kit — bone spear hits EVERYTHING on a 9 m,
+        // 1.2 m wide ground line; grave grasp roots a 4.5 m circle for 1 s
+        // (rooted bodies cannot move but can still fight, Vision 7).
+        [(int)AttackId.BoneSpear] = new(18, true, 9f, 360f, 0f, 4.5f,
+            AttackShape.Line, 1.2f),
+        [(int)AttackId.GraveGrasp] = new(6, false, 4.5f, 360f, 0f, 8.5f,
+            AttackShape.Arc, 0f, 1.0f),
     };
 
     public static Attack Get(int id) => Table.TryGetValue(id, out var atk)

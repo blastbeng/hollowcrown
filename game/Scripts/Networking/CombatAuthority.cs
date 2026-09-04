@@ -84,6 +84,7 @@ public partial class CombatAuthority : Node
         public void OnHitApplied(int amount, bool heavy, int hpAfter) { }
         public void OnStunned(float seconds) { }
         public void OnStealthed(bool stealthed) { }
+        public void OnRooted(float seconds) { }
         public void OnKilled() { }
         public void OnRespawned(int hpAfter, Vector3 spawnPos) { }
     }
@@ -524,7 +525,22 @@ public partial class CombatAuthority : Node
                    $"{dist:0.00} > {atk.Range + RangeSlack:0.00}");
             return;
         }
-        if (dist > 0.001f &&
+        if (atk.Shape == AttackShape.Line)
+        {
+            // Ground line (bone spear): perpendicular distance from the
+            // victim to the strip attackerPos -> attackerPos + facing*Range.
+            var fwd = facing;
+            fwd.Y = 0f;
+            fwd = fwd.Normalized();
+            float lateral = Mathf.Abs(to.Cross(fwd).Y);
+            if (lateral > atk.Width * 0.5f + RangeSlack)
+            {
+                Reject($"hit victim={victimId} peer={attackerPeer}: outside " +
+                       $"line (lateral {lateral:0.00} > {atk.Width * 0.5f + RangeSlack:0.00})");
+                return;
+            }
+        }
+        else if (dist > 0.001f &&
             Mathf.RadToDeg(facing.AngleTo(to.Normalized())) > atk.ArcDegrees * 0.5f)
         {
             Reject($"hit victim={victimId} peer={attackerPeer}: outside " +
@@ -550,6 +566,8 @@ public partial class CombatAuthority : Node
         SendApplyHit(victimId, dmg, atk.Heavy, hpAfter, killed);
         if (atk.StunSeconds > 0f && !killed)
             SendTargetStunned(victimId, atk.StunSeconds);
+        if (atk.RootSeconds > 0f && !killed)
+            SendTargetRooted(victimId, atk.RootSeconds);
         if (killed)
         {
             SendKillFeed($"{PeerName(attackerPeer)} slew {victim.DisplayName}");
@@ -637,6 +655,22 @@ public partial class CombatAuthority : Node
             Rpc(nameof(TargetStunnedRpc), victimId, seconds);
         else
             TargetStunnedRpc(victimId, seconds);
+    }
+
+    private void SendTargetRooted(int victimId, float seconds)
+    {
+        if (Networked)
+            Rpc(nameof(TargetRootedRpc), victimId, seconds);
+        else
+            TargetRootedRpc(victimId, seconds);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void TargetRootedRpc(int victimId, float seconds)
+    {
+        if (_targets.TryGetValue(victimId, out var victim))
+            victim.OnRooted(seconds);
     }
 
     private void SendTargetRespawned(int victimId, int hpAfter)
