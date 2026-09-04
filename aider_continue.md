@@ -169,29 +169,30 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Revenant kit slice 2 (Vision 7): life drain (R — channel line, ticks
-   damage along the strip, heals the caster ~50%; needs server heal path
-   ApplyHealRpc + channel tick RPCs) + soul ward (F — absorb shield pool:
-   server-owned per-peer ward dict, subtract before HP in ValidateAndApply,
-   broadcast WardStateRpc for the VFX disc). Model variant, line hitbox,
-   root state + ICombatTarget.OnRooted all DONE in session 10.
+1. Balance harness v1 (NEXT TASKS 3 pulled up): it UNBLOCKS the last two
+   revenant verifications — ward ABSORPTION (a hit on a warded body) and the
+   uncapped LEECH (a damaged caster) are unreachable offline (self-hit
+   guard) and need a bot attacker. Bot = headless client that joins,
+   moves toward the nearest target and chain-attacks on a timer (no MCP
+   dependency, launch flag --bot). Then print the winrate matrix per
+   BALANCE.md. ALSO add HC_JOIN env support in Main (mirror of HC_CLASS)
+   so the playtester client can join realms for driven PvP tests.
 2. Arena polish remainder: gothic arches (store assets or Blender), banner
    sway, chains/cobwebs (6.7), ember mote tuning (currently reads as glow —
    want distinct rising sparks). (Rubble ~2x DONE, verified on screen.)
-3. Balance harness v1: bot mirror matches, winrate matrix printed.
-4. XP/leveling + progression sync to central + results screen; while there:
+3. XP/leveling + progression sync to central + results screen; while there:
    character-select card click should set PlayerController.PendingClass +
    CombatAuthority.PendingClass (classes are boot-flag only right now).
-5. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-6. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
+4. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+5. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
    Vision 4 wants match-server tokens for /servers/heartbeat + PUT progress
    — land them here).
-7. Skirmish mode (3v3) + team spawns/score.
-8. Open world zone: village chunks, shrines, roaming elites, minimap.
-9. Matchmaking quick-play flow via central.
-10. Atmosphere pass 2: ambience audio, fog drift, fireflies.
-11. Windows + Linux export presets + dedicated server headless export.
-12. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
+6. Skirmish mode (3v3) + team spawns/score.
+7. Open world zone: village chunks, shrines, roaming elites, minimap.
+8. Matchmaking quick-play flow via central.
+9. Atmosphere pass 2: ambience audio, fog drift, fireflies.
+10. Windows + Linux export presets + dedicated server headless export.
+11. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
     session 9 also saw a client ENet peer go INACTIVE while Networked==true,
     spewing "multiplayer instance isn't currently active" each frame: detect
     and recover), position-report trust checks (anti-cheat: shadow step is
@@ -268,7 +269,24 @@ bridge is single-client: duplicate godot-mcp node processes (stale npx
 children) hold the slot — kill the stale pid holding the ESTAB 6550
 connection, or restart the editor. (31) The playtester runs the game
 WITHOUT user args — HC_CLASS is the only clean way to pick the class for
-MCP-driven runs. NEXT: revenant slice 2 (drain + ward).
+MCP-driven runs. NEXT: revenant slice 2 (drain + ward). — DONE in the same
+session (see session 10 addendum below).
+
+SESSION 10 ADDENDUM — REVENANT SLICE 2 DONE and verified (Vision 7):
+life drain (R — 2s channel, 4 x 8 dmg ticks along a 6 m x 1.2 m line,
+server leeches 50% of each tick to the caster via HealedRpc, capped at max
+HP) + soul ward (F — server-owned 40 absorb pool eaten BEFORE HP, 8 s
+expiry, WardStateRpc mirror + arcane disc under the caster). ICombatTarget
++= OnWard/OnHealed. EVIDENCE: drain 100->92->84->76->68 EXACT (attack=10
+dmg=8 x4), line VFX verified numerically (mesh AABB far end = dummy
+direction), stamina cost, ward grant "absorbs 40 for 8s" + arcane disc on
+screen + "ward expired peer=1" on schedule, stun breaks the channel (no
+ticks after OnStunned), leech capped branch proven by ABSENCE of heal lines
+at full HP. ABSORPTION + uncapped leech are UNREACHABLE offline (self-hit
+guard victimId == attackerPeer is correct game behavior) — they need a bot
+attacker: balance harness (now NEXT TASKS 1) unblocks them. ALL FOUR
+revenant/niginblade HUD slots render (Q Spear / E Grasp / R Drain / F
+Ward). Commits through 3895899.
 
 SESSION 9 NOTE (2026-09-04) — RIGGED CLASS MODELS DONE and verified
 end-to-end (Vision 6.8; capsule stand-ins retired on BOTH local player and
