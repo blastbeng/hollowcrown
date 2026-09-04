@@ -169,24 +169,65 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Rigged class models: store humanoid with FACE + per-class silhouette
-   (Warden broad + shield), retint, weapon sockets, run/attack/roll/death
-   anims (Vision 6.8 — capsule stand-in is temporary). Search the store FIRST.
-2. Nightblade + Revenant kits (data-driven, BALANCE.md entries).
-3. Arena polish remainder: gothic arches (store assets or Blender), banner
+1. Nightblade + Revenant kits (data-driven, BALANCE.md entries) — reuse the
+   WardenModel pipeline: per-class variant (slim + two daggers / hooded +
+   staff) via an EnemyTint-style export + weapon-socket swap. Model pipeline
+   PROVEN (session 9): store asset -> retint shader -> bone sockets -> clips.
+2. Arena polish remainder: gothic arches (store assets or Blender), banner
    sway, chains/cobwebs (6.7), ember mote tuning (currently reads as glow —
    want distinct rising sparks). (Rubble ~2x DONE, verified on screen.)
-4. Balance harness v1: bot mirror matches, winrate matrix printed.
-5. XP/leveling + progression sync to central + results screen.
-6. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-7. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
-8. Skirmish mode (3v3) + team spawns/score.
-9. Open world zone: village chunks, shrines, roaming elites, minimap.
-10. Matchmaking quick-play flow via central.
-11. Atmosphere pass 2: ambience audio, fog drift, fireflies.
-12. Windows + Linux export presets + dedicated server headless export.
-13. Robustness: rejoin UX (kicked/lost peers currently just resume offline),
-    position-report trust checks (anti-cheat), nameplate HP bars.
+3. Balance harness v1: bot mirror matches, winrate matrix printed.
+4. XP/leveling + progression sync to central + results screen.
+5. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+6. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open).
+7. Skirmish mode (3v3) + team spawns/score.
+8. Open world zone: village chunks, shrines, roaming elites, minimap.
+9. Matchmaking quick-play flow via central.
+10. Atmosphere pass 2: ambience audio, fog drift, fireflies.
+11. Windows + Linux export presets + dedicated server headless export.
+12. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
+    session 9 also saw a client ENet peer go INACTIVE while Networked==true,
+    spewing "multiplayer instance isn't currently active" each frame: detect
+    and recover), position-report trust checks (anti-cheat), nameplate HP
+    bars over REMOTE avatars, attack-cast relay (puppets can't show remote
+    swings yet — only locomotion/hit/death).
+
+SESSION 9 NOTE (2026-09-04) — RIGGED CLASS MODELS DONE and verified
+end-to-end (Vision 6.8; capsule stand-ins retired on BOTH local player and
+remote avatars). Asset: "Quaternius IK-Rigged Characters" (old library #5235,
+CC0 — verified LICENSE file; JamesonBradfield/Quaternius) = rigged
+GeneralSkeleton humanoid (65 bones, FACE meshes: eyes + eyebrows) + full
+UAL1_Standard animation library. LAYOUT GOTCHA: the pack's mesh .res files
+embed material refs to res://Godot - UE/*.png — the textures MUST sit at
+game/Godot - UE/ (author's original layout) or every load errors; lean-copied
+male-only + Animations/*.res (glb.import save_to_file uids reference them —
+omitting them sprays 91 'Unrecognized UID' warnings). New: WardenModel.cs
+(shader-retinted steel body, sword+shield BoneAttachment3D sockets on
+RightHand/LeftHand, locomotion from velocity, one-shot attack/roll/hit/death
+API, EnemyTint export) + steel_limb.gdshader (grayscale-luminance body tint —
+a plain AlbedoColor multiply CANNOT desaturate the warm tan suit; judge on
+screen, two failed tints preceded the shader). PlayerController drives the
+model (WASD=Walk/Jog, Space=Roll, chain=Sword_Attack via WardenChain hook,
+hits=Hit_Chest, death=Death01+fade). RemoteAvatar: same model, cold-steel
+EnemyTint, red nameplate, locomotion from relay velocity, hit/death mirrors.
+SCALE proof: head bone 1.61m natural -> scale 1.15 => 1.84m (6.4 spec 1.8m);
+greatsword 1.44m. EVIDENCE: dummy chain 100->80->25 EXACT via the authority
+with Sword_Attack raised-blade frames + ground arc flash; PvP 2 clients+server:
+server log "hit victim=... attack=1/2/3 dmg=20/20/35 hp=80/60/25", target
+frame WARDEN#<peer> live, red-nameplate enemy puppet on screen; dodge stamina
+100->75 exact; fixed REALM JOIN RACE (JoinRealm dialed BEFORE attaching
+CombatAuthority -> ConnectedToServer fired into the void -> server held the
+join unapproved forever; now authority attaches first + _Ready catch-up
+handshake; server log "peer approved — spawns at ..." + position reports
+flowing). FIXED --join crash (EnterRealm dereferenced _ui before menus were
+built — caught by the B-client smoke test). Commits a1b13fc..96f5c1a.
+GOTCHAS (session 9): (22) type_text/inputs are DROPPED while the game is
+frozen — thaw first, or ride inputs inside godot_game_time step. (23) After
+teleporting the player, the iso camera needs ~0.5s thawed to converge before
+a screenshot. (24) RemoteAvatar node name is "Remote{peerId}", not
+"RemoteAvatar". (25) EnterRealm is now called before dialing: it must never
+assume _ui exists (--join path). (26) Two Client B relaunches needed the
+freshest assembly — kill the old --join process before relaunch after a pull.
 
 SESSION 8 NOTE (2026-09-04) — FULL REPO REVIEW done (verdict: first steps
 sound — architecture, authority model, security basics and tooling all match
