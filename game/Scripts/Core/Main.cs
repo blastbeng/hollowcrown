@@ -38,6 +38,9 @@ public partial class Main : Node3D
         string joinHost = "";
         int joinPort = 0;
         string joinPassword = "";
+        bool botMode = false;
+        string botClasses = "warden";
+        float quitAfter = -1f;
 
         foreach (var arg in OS.GetCmdlineUserArgs())
         {
@@ -50,6 +53,8 @@ public partial class Main : Node3D
                 GD.Print("HOLLOWCROWN BOOT OK — dedicated server mode, arena hosted");
                 return;
             }
+            if (arg == "--bot")
+                botMode = true;
         }
 
         // --join host:port [--password x]: direct-IP join without the menu
@@ -74,6 +79,52 @@ public partial class Main : Node3D
                 // picks the class via the selected character card.
                 PlayerController.PendingClass = PlayerClassInfo.FromId(args[++i]);
             }
+            else if (args[i] == "--bot-classes" && i + 1 < args.Length)
+            {
+                botClasses = args[++i].ToLowerInvariant();
+            }
+            else if (args[i].StartsWith("--bot-classes="))
+            {
+                botClasses = args[i]["--bot-classes=".Length..].ToLowerInvariant();
+            }
+            else if (args[i] == "--quit-after" && i + 1 < args.Length)
+            {
+                // Harness runtime: bot-vs-bot runs must TERMINATE (no GUI,
+                // no MCP). -1 / flag omitted = run until stopped.
+                float.TryParse(args[++i], System.Globalization.CultureInfo.InvariantCulture,
+                    out quitAfter);
+            }
+            else if (args[i].StartsWith("--quit-after="))
+            {
+                float.TryParse(args[i]["--quit-after=".Length..],
+                    System.Globalization.CultureInfo.InvariantCulture, out quitAfter);
+            }
+        }
+
+        // HC_BOT (bot class list) and HC_JOIN (join target, host:port) mirror
+        // --bot / --join for the playtester, which runs the game WITHOUT user
+        // args (same pattern as HC_CLASS).
+        string envBot = OS.GetEnvironment("HC_BOT");
+        if (envBot.Length > 0)
+        {
+            botMode = true;
+            botClasses = envBot.ToLowerInvariant();
+        }
+        string envJoin = OS.GetEnvironment("HC_JOIN");
+        if (envJoin.Length > 0 && joinHost.Length == 0)
+        {
+            var envParts = envJoin.Split(':');
+            if (envParts.Length == 2 && int.TryParse(envParts[1], out int envPort))
+            {
+                joinHost = envParts[0];
+                joinPort = envPort;
+            }
+        }
+
+        if (botMode)
+        {
+            BootBotHarness(joinHost, joinPort, joinPassword, botClasses, quitAfter);
+            return;
         }
 
         if (joinHost.Length > 0)
@@ -167,5 +218,110 @@ public partial class Main : Node3D
             return;
         AddChild(new CombatAuthority { Name = "CombatAuthority" },
             forceReadableName: true);
+    }
+
+    /// <summary>Playtester hook (same spirit as JoinRealm for smoke tests):
+    /// arm one harness bot INSIDE a driven run — this is what makes the
+    /// ward ABSORPTION and uncapped LEECH branches reachable offline (a
+    /// real attacker while the MCP drives the player). Harness bots use
+    /// explicit ids (500+) through RequestHitAs.</summary>
+    public void SpawnTestBot(string classId, Vector3 pos)
+    {
+        if (GetNodeOrNull("TestBot") is not null)
+            return;
+        var bot = new CombatBot
+        {
+            Name = "TestBot",
+            ClassId = classId,
+            BotName = $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(classId))}Bot",
+            Position = pos,
+        };
+        AddChild(bot, forceReadableName: true);
+        if (bot.CombatId < 0)
+            bot.AssignCombatId(_nextTestBotId++);
+        GD.Print($"BOT HARNESS READY — test bot armed ({classId}) at {pos}");
+    }
+
+    private int _nextTestBotId = 500;
+
+    /// <summary>Balance harness (Vision 7 / NEXT TASKS 1): boot 1-2 bots in
+    /// an arena realm, run them headless/hidden, print the winrate matrix,
+    /// then quit. With --join/HC_JOIN the bots join a REALM (a bot client
+    /// fights the server's realm over ENet — this is what makes warded
+    /// victims + damaged casters reachable); without, the bots fight offline
+    /// (fastest local matrix). Bot per-class cadence/damage rides CombatTables
+    /// exactly like players (server-validated).
+    /// Usage: godot --headless -- --bot [--bot-classes a+b] [--join h:p]
+    /// [--quit-after 30]</summary>
+    private void BootBotHarness(string joinHost, int joinPort, string joinPassword,
+        string botClasses, float quitAfter)
+    {
+        if (joinHost.Length > 0)
+        {
+            // Bots joining a REALM: attach the authority + dial the host
+            // FIRST (spawn approval re-registers each bot under its ENet
+            // peer id — the realm is up before the bots spawn).
+            EnterRealm();
+            CombatAuthority.PendingPassword = joinPassword;
+            var peer = new ENetMultiplayerPeer();
+            if (peer.CreateClient(joinHost, joinPort) != Error.Ok)
+            {
+                GD.PrintErr($"BOT HARNESS: could not open socket to {joinHost}:{joinPort}");
+                return;
+            }
+            Multiplayer.MultiplayerPeer = peer;
+            GD.Print($"BOT HARNESS — joining realm at {joinHost}:{joinPort}");
+        }
+        else
+        {
+            // Offline harness: a BARE combat world (floor only). ArenaTest
+            // pulls the rigged models + the UI flow — headless, its missing-
+            // animation error spam (~40 MB in 3 min) starves the quit timer.
+            // A harness run is judged from the authority log, not pixels.
+            AddCombatAuthority();
+            var floor = new StaticBody3D { Name = "HarnessFloor" };
+            floor.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(60, 0.2f, 60) },
+                Position = new Vector3(0, -0.1f, 0),
+            });
+            AddChild(floor);
+            GD.Print("BOT HARNESS — offline bots on the bare combat floor");
+        }
+
+        string[] classes = botClasses.Length > 0
+            ? botClasses.Split('+')
+            : System.Array.Empty<string>();
+        string[] valid = { "warden", "nightblade", "revenant" };
+        for (int i = 0; i < classes.Length; i++)
+        {
+            string classId = classes[i].Trim();
+            if (System.Array.IndexOf(valid, classId) < 0)
+                classId = valid[i % valid.Length];
+            var bot = new CombatBot
+            {
+                Name = $"Bot{i}",
+                ClassId = classId,
+                BotName = $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(classId))}Bot{i}",
+                Position = new Vector3(i == 0 ? -5f : 5f, 0.2f, i == 0 ? 8f : -8f),
+            };
+            AddChild(bot, forceReadableName: true);
+            // Offline bots self-assign 500+ in _Ready; joining bots spawn at
+            // id 1 until the realm approves them (their real ENet id, then).
+            if (joinHost.Length == 0 && bot.CombatId < 0)
+                bot.AssignCombatId(500 + i);
+        }
+        GD.Print($"BOT HARNESS READY — classes={botClasses} join={(joinHost.Length > 0 ? joinHost : "offline")} quit_after={quitAfter}");
+
+        if (quitAfter > 0f)
+        {
+            var timer = new Timer { WaitTime = quitAfter, Autostart = true, OneShot = true };
+            timer.Timeout += () =>
+            {
+                GD.Print("BOT HARNESS DONE — quitting (use the log above this line for the matrix)");
+                GetTree().Quit();
+            };
+            AddChild(timer);
+        }
     }
 }

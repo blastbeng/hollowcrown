@@ -276,6 +276,17 @@ public partial class CombatAuthority : Node
         {
             // My spawn approval: reposition the local warden + re-register
             // under the real ENet peer id (boot-time registration used id 1).
+            // The balance harness joins REALMS with bot bodies, not the UI
+            // player — the bots are Main children (Bot0/Bot1) and register
+            // here too.
+            var bot = GetParent().GetNodeOrNull<CombatBot>($"Bot{peerId - 1}");
+            if (bot is not null)
+            {
+                bot.GlobalPosition = spawnPos;
+                bot.Velocity = Vector3.Zero;
+                bot.AssignCombatId(peerId);
+                RegisterBot(bot);
+            }
             var player = arena?.GetNodeOrNull<PlayerController>("Player");
             if (player is not null)
             {
@@ -381,6 +392,30 @@ public partial class CombatAuthority : Node
         RegisterPlayer(player, MyPeerId);
     }
 
+    /// <summary>Balance-harness bots (Vision 7): same registration path as
+    /// the local player, under the bot's combat id (offline 500+, networked
+    /// its real ENet peer id once approved).</summary>
+    public void RegisterBot(CombatBot bot)
+    {
+        // A joining bot re-registers from its boot id — drop the stale row.
+        foreach (var (id, target) in _targets)
+        {
+            if (target == bot && id != bot.CombatId)
+            {
+                _targets.Remove(id);
+                _hp.Remove(id);
+                _maxHp.Remove(id);
+                _respawnPos.Remove(id);
+                break;
+            }
+        }
+        _targets[bot.CombatId] = bot;
+        _hp[bot.CombatId] = bot.MaxHp;
+        _maxHp[bot.CombatId] = bot.MaxHp;
+        _respawnPos[bot.CombatId] = bot.CombatPosition;
+        GD.Print($"AUTHORITY: bot \"{bot.DisplayName}\" registered id={bot.CombatId} max_hp={bot.MaxHp}");
+    }
+
     private void RegisterPlayer(PlayerController player, int peerId)
     {
         foreach (var (id, target) in _targets)
@@ -418,6 +453,19 @@ public partial class CombatAuthority : Node
     {
         if (IsAuthorityMode)
             ValidateAndApply(MyPeerId, victimId, attackId, attackerPos, facing);
+        else
+            RpcId(1, nameof(SubmitHitRpc), victimId, attackId, attackerPos, facing);
+    }
+
+    /// <summary>Balance-harness entry (Vision 7): same validation path, but
+    /// the attacking peer id is EXPLICIT — offline bots are not the local
+    /// player (peer 1), so the harness can attribute hits to each bot.
+    /// Networked bots go through RequestHit (socket sender is authoritative).</summary>
+    public void RequestHitAs(int attackerId, int victimId, int attackId,
+        Vector3 attackerPos, Vector3 facing)
+    {
+        if (IsAuthorityMode)
+            ValidateAndApply(attackerId, victimId, attackId, attackerPos, facing);
         else
             RpcId(1, nameof(SubmitHitRpc), victimId, attackId, attackerPos, facing);
     }
@@ -494,6 +542,15 @@ public partial class CombatAuthority : Node
         if (victimId == attackerPeer)
         {
             Reject($"hit victim={victimId} peer={attackerPeer}: self-targeting");
+            return;
+        }
+        // Harness bots request hits for ids the ENet socket knows nothing
+        // about — only the SENDERS of real peer ids must be checked.
+        if (attackerPeer != Multiplayer.GetRemoteSenderId() &&
+            !(attackerPeer == MyPeerId && attackerPeer == 1) &&
+            !(attackerPeer >= 500 && attackerPeer < 1000))
+        {
+            Reject($"hit victim={victimId} peer={attackerPeer}: not the request sender");
             return;
         }
         if (!_targets.TryGetValue(victimId, out var victim))
@@ -630,6 +687,8 @@ public partial class CombatAuthority : Node
         {
             SendKillFeed($"{PeerName(attackerPeer)} slew {victim.DisplayName}");
             _respawnAt[victimId] = now + RespawnDelay;
+            GD.Print($"AUTHORITY: KILL attacker={PeerName(attackerPeer)} " +
+                     $"victim={victim.DisplayName}");
         }
         GD.Print($"AUTHORITY: hit victim={victimId} attack={attackId} " +
                  $"dmg={dmg} hp={hpAfter}/{_maxHp[victimId]} peer={attackerPeer} " +
@@ -743,7 +802,17 @@ public partial class CombatAuthority : Node
         GD.Print($"AUTHORITY: smoke peer={peer} at {pos} for {CombatTables.SmokeDuration:0}s");
     }
 
-    private string PeerName(int peer) => Networked ? $"Warden#{peer}" : "You";
+    /// <summary>Stable display name for any combat id (killfeed + harness
+    /// matrix): networked peers get their roster name, bots keep their own,
+    /// the local player is "You" offline.</summary>
+    private string PeerName(int peer)
+    {
+        if (_peers.TryGetValue(peer, out var info) && info.Approved)
+            return $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(info.ClassId))}#{peer}";
+        if (_targets.TryGetValue(peer, out var target) && target is CombatBot bot)
+            return bot.DisplayName;
+        return Networked ? $"Warden#{peer}" : "You";
+    }
 
     // ---------------------------- broadcasts -------------------------------
     // Authority -> every peer. CallLocal = true runs them on the host too;

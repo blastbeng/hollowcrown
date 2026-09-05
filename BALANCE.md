@@ -98,3 +98,24 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 | buff_cap     | 1.25  | sane-cap anti-cheat on RequestBuff          |
 | position_sync | 10 Hz| client->server unreliable, relayed to peers |
 
+## Balance harness (Vision 7; CombatBot.cs + tools/balance_harness.sh)
+| name            | value   | notes                                          |
+|-----------------|---------|------------------------------------------------|
+| bot_ids         | 500+    | offline bots; world targets start at 1000       |
+| warden_bot      | 1.0 s   | chain 1/2/3 (20/20/35), reach 2.2 m             |
+| nightblade_bot  | 0.6 s   | dagger 5/6/7 (14/14/28), reach 1.8 m            |
+| revenant_bot    | 5.0 s   | bone spear only (18, 9 m line), reach 8.5 m     |
+| bot_move_speed  | 4.5 m/s | approach; fight starts inside reach*0.8         |
+| harness_run     | 25 s    | tools/balance_harness.sh [seconds] [a+b]        |
+
+### Matrix runs (KILL lines from the authority log)
+| date       | matchup              | result            | verdict              |
+|------------|----------------------|-------------------|----------------------|
+| 2026-09-05 | warden vs nightblade | 2 : 2 (25 s run)  | even — in band       |
+
+Interpretation: with NO dodges/blocks/kits the raw chain trade is even
+(nightblade cadence 0.6 s x 14/28 vs warden 1.0 s x 20/35). Matchups with
+driven skill use (dodge/parry/kits) need the playtester harness; the headless
+matrix proves the damage engine and class scaling, not full kit balance.
+Target per matchup (Vision 7): 45-55% once mode scoring lands.
+
