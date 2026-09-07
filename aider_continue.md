@@ -169,19 +169,18 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. XP/leveling + progression sync to central + results screen; while there:
-   character-select card click should set PlayerController.PendingClass +
-   CombatAuthority.PendingClass (classes are boot-flag only right now).
-2. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-3. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
+1. Loot slice 2: inventory/equip UI + affix effects on stats + equipment
+   changes the character's tint/attached meshes (Vision 8); serialize session
+   loot into the central gear_json on save (column exists, still '[]').
+2. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
    Vision 4 wants match-server tokens for /servers/heartbeat + PUT progress
    — land them here).
-4. Skirmish mode (3v3) + team spawns/score.
-5. Open world zone: village chunks, shrines, roaming elites, minimap.
-6. Matchmaking quick-play flow via central.
-7. Atmosphere pass 2: ambience audio, fog drift, fireflies.
-8. Windows + Linux export presets + dedicated server headless export.
-9. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
+3. Skirmish mode (3v3) + team spawns/score.
+4. Open world zone: village chunks, shrines, roaming elites, minimap.
+5. Matchmaking quick-play flow via central.
+6. Atmosphere pass 2: ambience audio, fog drift, fireflies.
+7. Windows + Linux export presets + dedicated server headless export.
+8. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
     session 9 also saw a client ENet peer go INACTIVE while Networked==true,
     spewing "multiplayer instance isn't currently active" each frame: detect
     and recover), position-report trust checks (anti-cheat: shadow step is
@@ -190,13 +189,72 @@ compile check (remote or local):
     swings/casts yet — only locomotion/hit/death), root/stealth visuals on
     remote puppets (root is server-applied but only the LOCAL body locks;
     RemoteAvatar.OnRooted is a no-op stub).
-10. Harness v2 (optional): full 3x3 class matrix in one run (3 bots, last-
+9. Harness v2 (optional): full 3x3 class matrix in one run (3 bots, last-
     standing scoring), per-matchup 45-55% tuning with kits (dodge/block use
     needs a smarter bot brain than chain-spam), CI hook in tools/test.sh.
-11. Arena polish leftovers (small): second banner palette on the far ring
+10. Arena polish leftovers (small): second banner palette on the far ring
     side, cobwebs under the arch lintels (currently high corners only),
     Prop_Crate/MetalFence kit pieces placed as spawn-side dressing (already
     committed in the lean subset, unused on screen yet).
+
+SESSION 13 NOTE (2026-09-07) — XP/LEVELING + PROGRESSION SYNC + RESULTS +
+LOOT SLICE 1 DONE, all verified end-to-end (Vision 6.10/8; was NEXT TASKS 1).
+PROGRESSION: Progression.cs = the curve XP(N) = 100 * N^1.5 (level 2 at
+100 XP, level 3 at 283 total) + kill rewards (50 PvP / 25 dummy, recorded in
+BALANCE.md). CombatAuthority awards XP SERVER-SIDE on the kill branch
+(kills/xp dictionaries + AwardKillXp -> ProgressRpc broadcast; ICombatTarget
++= OnProgress; PlayerController mirrors MatchKills/MatchXp into
+ProgressionSession). HUD level/XP row (top-left panel, live from
+session-base + match-mirror XP) + LEAVE REALM button. ResultsScreen
+(CanvasLayer 10): champion, kills, +XP, level, progress bar, LOOT GAINED
+rows, save status; Main.LeaveRealm shows it, frees authority+arena, resets
+peer/class, returns to character select; SaveProgressionToCentral PUTs
+base+match XP and mirrors the saved CharacterDto back. CHARACTER CARD PICK:
+BuildCard now has a Select button -> Pick() sets PlayerController.PendingClass
++ CombatAuthority.PendingClass + ProgressionSession.Select(central XP base)
++ LastPicked -> Main auto-opens the server browser (no more pickless path;
+cards show the CURVE level, not the raw central field).
+LOOT SLICE 1: ItemGenerator.cs (prefix+base+suffix names, 5 weighted
+rarities common 50/uncommon 28/rare 15/epic 5.5/mythic 1.5, 1-4 affixes by
+rarity from a stat pool scaled by ilvl, deterministic per seed,
+ToJson() for gear_json later) + LootDrop.cs (prism shard + rarity-colored
+glow light, 120 s lifetime that does NOT tick while the MCP bridge is
+stepping) + CombatAuthority.SpawnLootDrop on every kill (seed from ticks ^
+dropId, ilvl = 1 + killer_kills/3, LootDropRpc broadcast, every peer builds
+the identical item) + server-validated proximity pickup (0.25 s scan,
+RequestPickup -> SubmitPickupRpc -> ValidatePickup: too-far/gone REJECTed,
+LootTakenRpc frees the drop + ProgressionSession.AddLoot).
+EVIDENCE (dedicated server 7777 + client over ENet, all three sessions):
+login/register -> character select -> card pick (Vex, warden) -> server
+browser -> direct join -> spawn at point 0 as WARDEN (class from the card,
+"LEVEL 1 — 0 kills" HUD row); kill loop 100->60->0, killfeed
+"Warden#1462151701 slew the Training Dummy" (server-side naming),
+"AUTHORITY: XP +25 (kills=1)", drop "Rotted Pauldrons of Withering
+(uncommon)"/"Ashen Pauldrons (uncommon)" spawned; walk-over pickup -> drop
+freed -> results screen: KILLS 1, XP +25, LOOT GAINED 1 item(s) — Ashen
+Pauldrons (uncommon), LEVEL 2, "progress saved — level 2, xp 100"; central
+DB re-read: {"level":2,"xp":100} (was xp 0 at creation) and the card
+re-read shows level 2. Zero script errors; screenshots judged vs Section 6
+(login, character select, server browser, WIDE iso arena with HUD + level
+row, kill action, results). Balance harness regression: 25 s offline
+warden-vs-nightblade = 2:2 kills (unchanged) with +50 XP per KILL line.
+COMMITS 0654d53, 40c1f61, 7b5449d, fb2ea60.
+FIXES found by testing: (a) dummy arc rejects — the dummy was TELEPORTED on
+the client only; the server validates against ITS OWN world copy (never
+move a combat target on one peer), park the PLAYER on the cursor-opposite
+side of the server's build position instead. (b) server drop expired before
+the pickup — 45 s lifetime + frozen tool-call latency; lifetime -> 120 s
+and frozen-bridge windows no longer tick it. GOTCHAS (session 13): (43)
+Playtester type_text never reached the login LineEdits (focus lands on a
+Button after screen swaps) — exec-fill the fields + emit pressed, or
+Shift+Tab-walk focus first. (44) The frozen OS cursor's ground point is
+stable at (12.8, 0, -7.8) on this rig — parking the player relative to IT
+is deterministic (session-5 gotcha 7, still true). (45) C# statics
+(ProgressionSession) are invisible to exec GDScript — read session state
+through nodes (results screen) or RPC logs. (46) A server process started
+in one ssh call may outlive the ssh session but a SECOND nohup relaunch in
+the same command can wedge the pipe — launch and verify in SEPARATE ssh
+calls. NEXT: loot slice 2 (NEXT TASKS 1).
 
 SESSION 12 NOTE (2026-09-07) — ARENA POLISH DONE and verified on screen
 (Vision 6.6/6.7; was NEXT TASKS 1). Assets: Quaternius Medieval Village
