@@ -80,6 +80,14 @@ public partial class Main : Node3D
                 // picks the class via the selected character card.
                 PlayerController.PendingClass = PlayerClassInfo.FromId(args[++i]);
             }
+            else if (args[i] == "--character" && i + 1 < args.Length &&
+                     long.TryParse(args[++i], out long charId))
+            {
+                // Central character id for automated clients (MMR, Vision 8):
+                // the UI flow sets it on card pick; a driven second client
+                // declares its id here so its duel is RATED.
+                CombatAuthority.PendingCharacterId = charId;
+            }
             else if (args[i] == "--bot-classes" && i + 1 < args.Length)
             {
                 botClasses = args[++i].ToLowerInvariant();
@@ -121,6 +129,11 @@ public partial class Main : Node3D
                 joinPort = envPort;
             }
         }
+        // HC_CHARACTER mirrors --character for the playtester (it runs the
+        // game WITHOUT user args — same pattern as HC_CLASS/HC_BOT/HC_JOIN).
+        string envChar = OS.GetEnvironment("HC_CHARACTER");
+        if (envChar.Length > 0 && long.TryParse(envChar, out long envCharId))
+            CombatAuthority.PendingCharacterId = envCharId;
 
         if (botMode)
         {

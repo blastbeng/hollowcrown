@@ -37,14 +37,39 @@ curl -sf -X POST http://127.0.0.1:6561/auth/login -H 'Content-Type: application/
 CHAR=$(curl -sf -X POST http://127.0.0.1:6561/characters -H "$AUTH" -H 'Content-Type: application/json' -d '{"name":"Ashen","classId":"warden"}')
 echo "$CHAR" | grep -q '"classId":"warden"' || fail "characters create: $CHAR" 2
 CID=$(echo "$CHAR" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
-curl -sf -X PUT http://127.0.0.1:6561/characters/$CID/progress -H "$AUTH" -H 'Content-Type: application/json' -d '{"level":3,"xp":420,"gearJson":"[]"}' | grep -q '"level":3' || fail "progress save" 2
+CHAR2=$(curl -sf -X POST http://127.0.0.1:6561/characters -H "$AUTH" -H 'Content-Type: application/json' -d '{"name":"Umbra","classId":"nightblade"}')
+CID2=$(echo "$CHAR2" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+# Vision 4: progression saves are MATCH-SERVER owned — register the test realm
+# first, then PUT with the SERVER token (the user token alone must be 403).
+STOKEN=$(curl -sf -X POST http://127.0.0.1:6561/servers/register -H 'Content-Type: application/json' \
+  -d "{\"serverId\":\"test-$TS\",\"name\":\"Test Realm\",\"mode\":\"duel\",\"host\":\"127.0.0.1\",\"port\":7777,\"players\":0,\"maxPlayers\":2,\"hasPassword\":false}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+[ -n "$STOKEN" ] || fail "servers/register" 2
+SAUTH="Authorization: Bearer $STOKEN"
+CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT http://127.0.0.1:6561/characters/$CID/progress -H "$AUTH" -H 'Content-Type: application/json' -d '{"level":3,"xp":420,"gearJson":"[]"}')
+[ "$CODE" = "403" ] || fail "progress save WITHOUT server token must be 403 (got $CODE)" 2
+curl -sf -X PUT http://127.0.0.1:6561/characters/$CID/progress -H "$SAUTH" -H 'Content-Type: application/json' -d '{"level":3,"xp":420,"gearJson":"[]"}' | grep -q '"level":3' || fail "progress save (server token)" 2
 curl -sf http://127.0.0.1:6561/characters/$CID -H "$AUTH" | grep -q '"xp":420' || fail "progress reload" 2
-curl -sf -X POST http://127.0.0.1:6561/servers/heartbeat -H 'Content-Type: application/json' \
-  -d "{\"serverId\":\"test-$TS\",\"name\":\"Test Realm\",\"mode\":\"duel\",\"host\":\"127.0.0.1\",\"port\":7777,\"players\":1,\"maxPlayers\":2,\"hasPassword\":false}" >/dev/null || fail "heartbeat" 2
+# Elo (Vision 8): server-token report, zero-sum, DB-owned ratings.
+CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:6561/mmr/report -H "$SAUTH" -H 'Content-Type: application/json' \
+  -d "{\"serverToken\":\"$STOKEN\",\"modeId\":0,\"winnerCharacterId\":$CID,\"loserCharacterId\":$CID}")
+[ "$CODE" = "400" ] || fail "same-char mmr report must be 400 (got $CODE)" 2
+MMR=$(curl -sf -X POST http://127.0.0.1:6561/mmr/report -H "$SAUTH" -H 'Content-Type: application/json' \
+  -d "{\"serverToken\":\"$STOKEN\",\"modeId\":0,\"winnerCharacterId\":$CID,\"loserCharacterId\":$CID2,\"winnerBefore\":1000,\"loserBefore\":1000}")
+echo "$MMR" | grep -q '"winnerDelta":16' || fail "mmr report: $MMR" 2
+echo "$MMR" | grep -q '"loserDelta":-16' || fail "mmr zero-sum: $MMR" 2
+curl -sf http://127.0.0.1:6561/leaderboard | grep -q '"tier"' || fail "leaderboard" 2
+CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:6561/mmr/report -H 'Content-Type: application/json' \
+  -d "{\"serverToken\":\"nope\",\"modeId\":0,\"winnerCharacterId\":$CID,\"loserCharacterId\":$CID2}")
+[ "$CODE" = "403" ] || fail "mmr report without a real token must be 403 (got $CODE)" 2
+curl -sf -X POST http://127.0.0.1:6561/servers/heartbeat -H "$SAUTH" -H 'Content-Type: application/json' \
+  -d "{\"serverId\":\"test-$TS\",\"name\":\"Test Realm\",\"mode\":\"duel\",\"host\":\"127.0.0.1\",\"port\":7777,\"players\":1,\"maxPlayers\":2,\"hasPassword\":false,\"token\":\"$STOKEN\"}" >/dev/null || fail "heartbeat" 2
+CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:6561/servers/heartbeat -H 'Content-Type: application/json' \
+  -d "{\"serverId\":\"other-$TS\",\"name\":\"Rogue\",\"mode\":\"duel\",\"host\":\"127.0.0.1\",\"port\":7788,\"players\":0,\"maxPlayers\":2,\"hasPassword\":false}")
+[ "$CODE" = "403" ] || fail "heartbeat without token must be 403 (got $CODE)" 2
 curl -sf "http://127.0.0.1:6561/servers?mode=duel" | grep -q "Test Realm" || fail "server list" 2
 CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6561/characters -H "Authorization: Bearer bad")
 [ "$CODE" = "401" ] || fail "bad token must be rejected with 401 (got $CODE)" 2
-echo "auth/characters/heartbeat endpoint checks OK"
+echo "auth/characters/tokens/mmr/leaderboard endpoint checks OK"
 
 echo "== godot headless boot =="
 GODOT_BIN="$(command -v godot || true)"
