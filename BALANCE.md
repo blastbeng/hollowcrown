@@ -98,6 +98,29 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 | buff_cap     | 1.25  | sane-cap anti-cheat on RequestBuff          |
 | position_sync | 10 Hz| client->server unreliable, relayed to peers |
 
+## Progression (Vision 8; Progression.cs — server awards in CombatAuthority)
+| name            | value        | notes                                          |
+|-----------------|--------------|------------------------------------------------|
+| xp_curve        | 100 * N^1.5  | XP to advance FROM level N (Vision 8)          |
+| xp_player_kill  | 50           | PvP kill, server-awarded (ProgressRpc)         |
+| xp_dummy_kill   | 25           | training dummy (world targets id >= 1000)      |
+| max_level       | 100          | central caps reports at level 100              |
+| level_2         | 100 XP       | = 2 dummy kills or 50 + 1 dummy                |
+| level_3         | 283 XP total | 100 (L1) + 183 (L2)                            |
+| raw_stat_gain   | +10% cap     | at max level (Vision 8) — lands with gear      |
+
+Session flow (Vision 6.10): card pick stores central XP as the session base;
+match kills add XP server-side (mirror = MatchKills/MatchXp); Leave Realm
+-> results screen -> PUT /characters/{id}/progress saves base+match XP.
+| date       | check                         | result                                  |
+|------------|-------------------------------|------------------------------------------|
+| 2026-09-07 | kill XP award (dummy)         | 2 kills = +50 XP exact (2 x 25), server line |
+|            |                               | AUTHORITY: XP +25 (kills=1/2) per kill   |
+|            | central round-trip            | results screen -> PUT progress -> card   |
+|            |                               | re-read shows xp 50 (was 0 at creation)  |
+|            | class via card pick           | PendingClass + handshake armed from the  |
+|            |                               | card; ENet join spawned Warden at spawn 0|
+
 ## Balance harness (Vision 7; CombatBot.cs + tools/balance_harness.sh)
 | name            | value   | notes                                          |
 |-----------------|---------|------------------------------------------------|
