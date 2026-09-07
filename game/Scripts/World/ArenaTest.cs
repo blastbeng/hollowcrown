@@ -214,7 +214,13 @@ public partial class ArenaTest : Node3D
             // build once already. Instantiate the scene node instead.
             var archScene = GD.Load<PackedScene>("res://assets/models/medieval_kit/Wall_Arch.gltf");
             if (archScene?.Instantiate() is Node archModel)
+            {
                 arch.AddChild(archModel);
+                // The kit panel ships wood-trim materials — wrong for gothic
+                // STONE. Re-skin every mesh with the arena's wall stone so
+                // the arches read as part of the ruin (palette 6.10).
+                RetintToStone(archModel);
+            }
             // Panel collision: legs + lintel approximated by one 2 x 3 frame
             // box minus the door gap — two leg boxes keep the opening walkable.
             arch.AddChild(new CollisionShape3D
@@ -241,6 +247,17 @@ public partial class ArenaTest : Node3D
             }
             AddChild(arch);
         }
+    }
+
+    /// <summary>Re-skin kit geometry to the arena palette: every
+    /// MeshInstance3D under the instantiated .gltf gets the cached wall-stone
+    /// material (Vision 6.3: nothing visible keeps a foreign material).</summary>
+    private static void RetintToStone(Node root)
+    {
+        if (root is MeshInstance3D mi)
+            mi.MaterialOverride = MaterialFactory.WallStone();
+        foreach (var child in root.GetChildren())
+            RetintToStone(child);
     }
 
     /// <summary>Vision 6.7 world sellers: war banners on poles by the breach,
