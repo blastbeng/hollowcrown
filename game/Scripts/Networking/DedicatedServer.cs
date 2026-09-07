@@ -105,6 +105,7 @@ public partial class DedicatedServer : Node
         {
             _serverToken = resp.Token;
             CombatAuthority.ServerToken = resp.Token;
+            _central.ServerToken = resp.Token;   // heartbeats carry it as the bearer
             GD.Print($"SERVER_REGISTERED central_id={resp.ServerId} token={resp.Token[..8]}…");
         }
         else

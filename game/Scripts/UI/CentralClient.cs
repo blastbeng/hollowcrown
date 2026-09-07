@@ -32,6 +32,11 @@ public partial class CentralClient : Node
     public string Username { get; private set; } = "";
     public bool IsAuthenticated => Token.Length > 0;
 
+    /// <summary>Match-server token minted by /servers/register (Vision 4).
+    /// Sent as the Authorization bearer for heartbeats and as X-Server-Token
+    /// on progression saves relayed by an authenticated client.</summary>
+    public string ServerToken { get; set; } = "";
+
     /// <summary>Base URL override (DedicatedServer --central; env still wins
     /// for playtester runs that set HC_CENTRAL_URL).</summary>
     public string BaseUrl { get; set; } = "";
@@ -198,7 +203,15 @@ public partial class CentralClient : Node
     {
         try
         {
-            using var resp = await Http.PostAsJsonAsync($"{EffectiveBaseUrl}/servers/heartbeat", reg, JsonOpts);
+            using var msg = new HttpRequestMessage(HttpMethod.Post, $"{EffectiveBaseUrl}/servers/heartbeat")
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(reg, JsonOpts),
+                    System.Text.Encoding.UTF8, "application/json"),
+            };
+            if (ServerToken.Length > 0)
+                msg.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ServerToken);
+            using var resp = await Http.SendAsync(msg);
             return resp.IsSuccessStatusCode;
         }
         catch (Exception)
