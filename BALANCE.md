@@ -112,10 +112,21 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 | date       | matchup              | result            | verdict              |
 |------------|----------------------|-------------------|----------------------|
 | 2026-09-05 | warden vs nightblade | 2 : 2 (25 s run)  | even — in band       |
+| 2026-09-07 | warden vs nightblade | 2 : 2 (25 s run)  | even — in band       |
 
 Interpretation: with NO dodges/blocks/kits the raw chain trade is even
 (nightblade cadence 0.6 s x 14/28 vs warden 1.0 s x 20/35). Matchups with
 driven skill use (dodge/parry/kits) need the playtester harness; the headless
 matrix proves the damage engine and class scaling, not full kit balance.
 Target per matchup (Vision 7): 45-55% once mode scoring lands.
+
+### Playtester-driven harness verifications (SpawnTestBot + MCP, Vision 7)
+| date       | check                          | result                                   |
+|------------|--------------------------------|-------------------------------------------|
+| 2026-09-07 | ward ABSORPTION                | warded revenant ate two full bot strikes  |
+|            |                                | (20 then 35 dmg) — HP untouched both times |
+| 2026-09-07 | drain LEECH uncapped            | dummy 100->68 exact, caster healed 25->41 |
+|            |                                | (16 = 50% of 32, no cap at partial HP)    |
+| 2026-09-07 | bot kills the driven player    | warden bot full loop: 20/20/35, DOWN, 3 s |
+|            |                                | respawn, re-engage                        |
 

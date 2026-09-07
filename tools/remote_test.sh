@@ -15,6 +15,14 @@ GODOT_LOG=/tmp/hollowcrown_godot.log
 RESTART=0
 [ "${1:-}" = "--restart" ] && RESTART=1
 
+# Optional playtester env (HC_CLASS/HC_BOT/HC_JOIN) must cross the SSH hop:
+# build a safe remote export string from whatever is set locally.
+HC_EXPORTS=""
+for V in HC_CLASS HC_BOT HC_JOIN; do
+  VAL="${!V:-}"
+  [ -n "$VAL" ] && HC_EXPORTS="$HC_EXPORTS export $V='$VAL';"
+done
+
 sshrun() { ssh -i "$KEY" -o ConnectTimeout=6 -o BatchMode=yes "$RUSER@$HOST" "$@"; }
 port_up() { sshrun "ss -tln | grep -q ':$1 '" >/dev/null 2>&1; }
 
@@ -76,9 +84,7 @@ if ! port_up 6550; then
           export WAYLAND_DISPLAY=\${WD:-wayland-0}; \
           export DOTNET_ROOT=/usr/lib/dotnet; \
           export PATH=\"\$PATH:/usr/lib/dotnet:/opt/dotnet\"; \
-          export HC_CLASS='$HC_CLASS'; \
-          export HC_BOT='$HC_BOT'; \
-          export HC_JOIN='$HC_JOIN'; \
+          $HC_EXPORTS \
           nohup /usr/local/bin/godot --editor --path $GAME_DIR >$GODOT_LOG 2>&1 </dev/null &" >/dev/null 2>&1
   UP=0
   for _ in $(seq 1 12); do sleep 2; port_up 6550 && { UP=1; break; }; done
