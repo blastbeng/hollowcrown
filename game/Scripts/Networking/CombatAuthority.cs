@@ -764,8 +764,11 @@ public partial class CombatAuthority : Node
             SpawnLootDrop(victimId, victim.CombatPosition,
                 _kills.TryGetValue(attackerPeer, out int kk) ? kk : 0);
             // Vision 8 ranking: PvP kills resolve a duel Elo result (server
-            // -> central). Dummies (id >= 1000) never rank.
-            if (victimId < 1000)
+            // -> central). Real peers are in _peers — dummies (id >= 1000) and
+            // unregistered ids never rank (a huge ENet peer id is >= 1000:
+            // the old victimId < 1000 check silently skipped every real PvP
+            // kill — found live).
+            if (_peers.ContainsKey(victimId))
                 ReportMmr(attackerPeer, victimId, victim);
             GD.Print($"AUTHORITY: KILL attacker={PeerName(attackerPeer)} " +
                      $"victim={victim.DisplayName}");
@@ -782,7 +785,10 @@ public partial class CombatAuthority : Node
     /// broadcast to every peer so the LOCAL player's mirror + HUD stay live.</summary>
     private void AwardKillXp(int attackerPeer, int victimId, ICombatTarget victim)
     {
-        int xp = victimId >= 1000 ? Progression.XpPerDummyKill : Progression.XpPerPlayerKill;
+        // A peer (player or bot) is a ranked combatant; world targets
+        // (dummies, id >= 1000, never in _peers) give the smaller dummy XP.
+        // The old victimId >= 1000 check misread real ENet peer ids as dummies.
+        int xp = _peers.ContainsKey(victimId) ? Progression.XpPerPlayerKill : Progression.XpPerDummyKill;
         _kills[attackerPeer] = _kills.TryGetValue(attackerPeer, out int k) ? k + 1 : 1;
         _xp[attackerPeer] = _xp.TryGetValue(attackerPeer, out int x) ? x + xp : xp;
         SendProgress(attackerPeer, _kills[attackerPeer], _xp[attackerPeer]);
