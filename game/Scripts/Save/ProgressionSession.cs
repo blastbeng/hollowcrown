@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Hollowcrown.Shared;
 
 namespace Hollowcrown.Save;
@@ -17,6 +18,10 @@ public static class ProgressionSession
     public static int MatchKills { get; set; }
     public static int MatchXp { get; set; }
 
+    /// <summary>Loot picked up this match (Vision 8): name + rarity label,
+    /// shown on the results screen; serialized into gear_json on save later.</summary>
+    public static List<(string Name, string Rarity)> Loot { get; } = new();
+
     public static long TotalXp => BaseXp + MatchXp;
     public static int Level => Progression.LevelForXp(TotalXp);
 
@@ -30,11 +35,16 @@ public static class ProgressionSession
         BaseXp = xp;
         MatchKills = 0;
         MatchXp = 0;
+        Loot.Clear();
     }
+
+    public static void AddLoot(string name, string rarity) =>
+        Loot.Add((name, rarity));
 
     public static void ResetMatch()
     {
         MatchKills = 0;
         MatchXp = 0;
+        Loot.Clear();
     }
 }

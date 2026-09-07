@@ -3,6 +3,7 @@ using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Player;
 using Hollowcrown.Save;
+using Hollowcrown.World;
 
 namespace Hollowcrown.Networking;
 
@@ -112,7 +113,9 @@ public partial class CombatAuthority : Node
     // local player's mirror feeds the HUD and the results screen.
     private readonly Dictionary<int, int> _kills = new();
     private readonly Dictionary<int, int> _xp = new();
+    private int _nextDropId = 1;
     private int _nextSmokeZone;
+    private double _lootScanAccum;
     private int _nextId = 1000;                      // static world targets
     private int _spawnCounter;
     private double _positionAccum, _beatAccum;
@@ -694,6 +697,8 @@ public partial class CombatAuthority : Node
             SendKillFeed($"{PeerName(attackerPeer)} slew {victim.DisplayName}");
             _respawnAt[victimId] = now + RespawnDelay;
             AwardKillXp(attackerPeer, victimId, victim);
+            SpawnLootDrop(victimId, victim.CombatPosition,
+                _kills.TryGetValue(attackerPeer, out int kk) ? kk : 0);
             GD.Print($"AUTHORITY: KILL attacker={PeerName(attackerPeer)} " +
                      $"victim={victim.DisplayName}");
         }
@@ -730,6 +735,110 @@ public partial class CombatAuthority : Node
     {
         if (_targets.TryGetValue(peerId, out var target))
             target.OnProgress(kills, xp);
+    }
+
+    // ------------------------------ loot (Vision 8) -------------------------
+
+    /// <summary>The authority rolls a loot shard on every kill (item level
+    /// scales with the killer's match kills). Seeded + broadcast so every
+    /// peer builds the identical drop node at the victim's position.</summary>
+    private void SpawnLootDrop(int victimId, Vector3 position, int killerKills)
+    {
+        int dropId = _nextDropId++;
+        ulong seed = (ulong)Time.GetTicksMsec() ^ ((ulong)(uint)dropId * 0x9E3779B97F4A7C15UL);
+        int ilvl = 1 + killerKills / 3;
+        SendLootDrop(dropId, seed, ilvl, position);
+        GD.Print($"AUTHORITY: loot drop id={dropId} seed={seed} ilvl={ilvl} at {position}");
+    }
+
+    private void SendLootDrop(int dropId, ulong seed, int itemLevel, Vector3 pos)
+    {
+        if (Networked)
+            Rpc(nameof(LootDropRpc), dropId, seed, itemLevel, pos);
+        else
+            LootDropRpc(dropId, seed, itemLevel, pos);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void LootDropRpc(int dropId, ulong seed, int itemLevel, Vector3 pos)
+    {
+        var arena = GetParent().GetNodeOrNull<Node3D>("Arena");
+        if (arena is null)
+            return;
+        var drop = new LootDrop
+        {
+            Name = $"LootDrop{dropId}",
+            DropId = dropId,
+            Seed = seed,
+            ItemLevel = itemLevel,
+            Position = pos + new Vector3(0, 0.05f, 0),
+        };
+        arena.AddChild(drop, forceReadableName: true);
+    }
+
+    /// <summary>Client asks to pick up a drop; the server validates proximity
+    /// against ITS OWN last known player position before awarding.</summary>
+    public void RequestPickup(int dropId)
+    {
+        if (IsAuthorityMode)
+            ValidatePickup(MyPeerId, dropId);
+        else
+            RpcId(1, nameof(SubmitPickupRpc), dropId);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void SubmitPickupRpc(int dropId)
+        => ValidatePickup(Multiplayer.GetRemoteSenderId(), dropId);
+
+    private void ValidatePickup(int peer, int dropId)
+    {
+        var arena = GetParent().GetNodeOrNull<Node3D>("Arena");
+        var drop = arena?.GetNodeOrNull<World.LootDrop>($"LootDrop{dropId}");
+        if (drop is null || drop.IsTaken)
+        {
+            Reject($"pickup drop={dropId} peer={peer}: drop gone");
+            return;
+        }
+        Vector3 playerPos = _peers.TryGetValue(peer, out var info)
+            ? info.Position
+            : Vector3.Zero;
+        float dist = playerPos.DistanceTo(drop.GlobalPosition);
+        if (dist > World.LootDrop.PickupRadius + 0.5f)
+        {
+            Reject($"pickup drop={dropId} peer={peer}: too far ({dist:0.00} m)");
+            return;
+        }
+        drop.MarkTaken();
+        SendLootTaken(dropId, peer);
+    }
+
+    private void SendLootTaken(int dropId, int peer)
+    {
+        if (Networked)
+            Rpc(nameof(LootTakenRpc), dropId, peer);
+        else
+            LootTakenRpc(dropId, peer);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void LootTakenRpc(int dropId, int peer)
+    {
+        var arena = GetParent().GetNodeOrNull<Node3D>("Arena");
+        var drop = arena?.GetNodeOrNull<World.LootDrop>($"LootDrop{dropId}");
+        if (drop is not null)
+            drop.QueueFree();
+        if (peer == MyPeerId)
+        {
+            // Rebuild the item from the drop's seed (same math as _Ready).
+            var rng = new RandomNumberGenerator { Seed = drop?.Seed ?? 0 };
+            var item = ItemGenerator.Generate(rng, drop?.ItemLevel ?? 1);
+            ProgressionSession.AddLoot(item.Name, ItemGenerator.RarityLabel(item.Rarity));
+            GD.Print($"LOOT TAKEN: {item.Name} ({ItemGenerator.RarityLabel(item.Rarity)}) — session loot {
+                ProgressionSession.Loot.Count}");
+        }
     }
 
     private void ApplyBuff(int peer, float multiplier)
@@ -974,6 +1083,31 @@ public partial class CombatAuthority : Node
 
     public override void _Process(double delta)
     {
+        // Loot pickup proximity (Vision 8): walk over a shard -> pick it up
+        // through the server-validated path (offline: local authority).
+        if (_lootScanAccum >= 0.25)
+        {
+            _lootScanAccum = 0;
+            var arena = GetParent().GetNodeOrNull<Node3D>("Arena");
+            var ownBody = _targets.TryGetValue(MyPeerId, out var ownTarget)
+                ? ownTarget as Node3D
+                : null;
+            if (arena is not null && ownBody is not null && !ownTarget!.IsDead)
+            {
+                foreach (var child in arena.GetChildren())
+                {
+                    if (child is World.LootDrop dropNode && !dropNode.IsTaken &&
+                        ownBody.GlobalPosition.DistanceTo(dropNode.GlobalPosition)
+                            <= World.LootDrop.PickupRadius)
+                    {
+                        RequestPickup(dropNode.DropId);
+                        break;   // one per scan; the next pass takes the rest
+                    }
+                }
+            }
+        }
+        _lootScanAccum += delta;
+
         if (IsAuthorityMode && _respawnAt.Count > 0)
         {
             double now = Time.GetTicksMsec() / 1000.0;

@@ -50,6 +50,27 @@ public partial class ResultsScreen : CanvasLayer
         AddRow(box, "KILLS", ProgressionSession.MatchKills.ToString());
         AddRow(box, "XP EARNED", $"+{ProgressionSession.MatchXp}");
 
+        // Loot gained (Vision 8): what dropped and was picked up this match.
+        if (ProgressionSession.Loot.Count > 0)
+        {
+            AddRow(box, "LOOT GAINED", $"{ProgressionSession.Loot.Count} item(s)");
+            foreach (var (lootName, rarity) in ProgressionSession.Loot)
+            {
+                var lootLabel = new Label
+                {
+                    Text = $"· {lootName} ({rarity})",
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                };
+                lootLabel.AddThemeFontSizeOverride("font_size", 13);
+                lootLabel.AddThemeColorOverride("font_color", UiTheme.Arcane);
+                box.AddChild(lootLabel);
+            }
+        }
+        else
+        {
+            AddRow(box, "LOOT GAINED", "none");
+        }
+
         long total = ProgressionSession.TotalXp;
         int level = Progression.LevelForXp(total);
         AddRow(box, "LEVEL", level >= Progression.MaxLevel ? $"{level} (MAX)" : level.ToString());
