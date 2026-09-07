@@ -179,14 +179,16 @@ public partial class CharacterSelect : Control
 
     /// <summary>Pick a champion: sets PendingClass for BOTH the local body and
     /// the realm handshake (NEXT TASKS 1), stores the progression session
-    /// (central XP at pick time) and opens the server browser.</summary>
+    /// (central XP + GEAR at pick time — loot slice 2 restores the bag) and
+    /// opens the server browser.</summary>
     private void Pick(CharacterDto c)
     {
         PlayerController.PendingClass = PlayerClassInfo.FromId(c.ClassId);
         CombatAuthority.PendingClass = c.ClassId;
-        ProgressionSession.Select(c.Id, c.Name, c.ClassId, c.Xp);
+        ProgressionSession.Select(c.Id, c.Name, c.ClassId, c.Xp, c.GearJson);
         LastPicked = c;
-        GD.Print($"CHARACTER PICKED: {c.Name} ({c.ClassId}) id={c.Id} xp={c.Xp} — class armed, session started");
+        GD.Print($"CHARACTER PICKED: {c.Name} ({c.ClassId}) id={c.Id} xp={c.Xp} " +
+                 $"gear={c.GearJson} — class armed, session started");
         SetStatus($"{c.Name} selected — entering the server browser", UiTheme.Accent);
         EmitSignal(SignalName.CharacterPicked, c.Name);
     }

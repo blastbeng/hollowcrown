@@ -50,19 +50,23 @@ public partial class ResultsScreen : CanvasLayer
         AddRow(box, "KILLS", ProgressionSession.MatchKills.ToString());
         AddRow(box, "XP EARNED", $"+{ProgressionSession.MatchXp}");
 
-        // Loot gained (Vision 8): what dropped and was picked up this match.
+        // Loot gained (Vision 8 loot slice 2): full items with affixes —
+        // what dropped, was picked up, and now persists in gear_json.
         if (ProgressionSession.Loot.Count > 0)
         {
             AddRow(box, "LOOT GAINED", $"{ProgressionSession.Loot.Count} item(s)");
-            foreach (var (lootName, rarity) in ProgressionSession.Loot)
+            foreach (var item in ProgressionSession.Loot)
             {
                 var lootLabel = new Label
                 {
-                    Text = $"· {lootName} ({rarity})",
+                    Text = $"· {item.Name} ({ItemGenerator.RarityLabel(item.Rarity)}) — {ItemGenerator.AffixList(item)}",
                     HorizontalAlignment = HorizontalAlignment.Center,
                 };
                 lootLabel.AddThemeFontSizeOverride("font_size", 13);
-                lootLabel.AddThemeColorOverride("font_color", UiTheme.Arcane);
+                lootLabel.AddThemeColorOverride("font_color",
+                    (int)item.Rarity >= (int)ItemGenerator.Rarity.Rare
+                        ? ItemGenerator.RarityColor(item.Rarity)
+                        : UiTheme.Arcane);
                 box.AddChild(lootLabel);
             }
         }

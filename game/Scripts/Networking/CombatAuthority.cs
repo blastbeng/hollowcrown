@@ -44,6 +44,15 @@ public partial class CombatAuthority : Node
 
     [Signal] public delegate void KillFeedEventHandler(string text);
 
+    /// <summary>Loot slice 2 (Vision 8): fired when the AUTHORITY grants a
+    /// pickup to a peer — the inventory panel refreshes on it.</summary>
+    [Signal] public delegate void LootGrantedEventHandler(string itemName, string rarityLabel);
+
+    /// <summary>Loot slice 2 (Vision 8): fired when a peer (re-)equips an
+    /// item — the model retints on it (equipment changes the character's
+    /// look).</summary>
+    [Signal] public delegate void EquipmentChangedEventHandler(int peerId);
+
     /// <summary>Password the NEXT outbound connection presents at handshake
     /// (set by ServerBrowser.Join or the --join launch flag before dialing).</summary>
     public static string PendingPassword = "";
@@ -52,6 +61,15 @@ public partial class CombatAuthority : Node
     /// ("warden"/"nightblade"/"revenant") — the server needs it for display
     /// names and so every peer spawns the right enemy model variant.</summary>
     public static string PendingClass = "warden";
+
+    /// <summary>Loot slice 2 (Vision 8): derived max HP for a peer — base 100
+    /// + vitality affixes on the session's equipped gear (BALANCE.md affix
+    /// table). Only the LOCAL session is known here; remote peers' gear
+    /// lives on their own clients.</summary>
+    public static int MaxHpOf(int peerId) =>
+        peerId == 1 || (peerId >= 500 && peerId < 1000)
+            ? ProgressionSession.DerivedMaxHp
+            : PlayerMaxHp;
 
     private sealed class PeerInfo
     {
@@ -239,8 +257,12 @@ public partial class CombatAuthority : Node
         var record = new PeerTargetRecord(this, peer, name);
         info.Target = record;
         _targets[peer] = record;
-        _hp[peer] = PlayerMaxHp;
-        _maxHp[peer] = PlayerMaxHp;
+        // Loot slice 2 (Vision 8): vitality affixes on EQUIPPED gear raise
+        // max HP — the server computes the derived number from the session
+        // stats (peer identity == the local session on that peer).
+        int maxHp = MaxHpOf(peer);
+        _hp[peer] = maxHp;
+        _maxHp[peer] = maxHp;
         _respawnPos[peer] = spawn;
         info.Position = spawn;
         SendSpawnPlayer(peer, spawn, name, info.ClassId);
@@ -792,8 +814,7 @@ public partial class CombatAuthority : Node
     private void SubmitPickupRpc(int dropId)
         => ValidatePickup(Multiplayer.GetRemoteSenderId(), dropId);
 
-    private void ValidatePickup(int peer, int dropId)
-    {
+    private void ValidatePickup(int peer, int dropId)    {
         var arena = GetParent().GetNodeOrNull<Node3D>("Arena");
         var drop = arena?.GetNodeOrNull<World.LootDrop>($"LootDrop{dropId}");
         if (drop is null || drop.IsTaken)
@@ -812,6 +833,16 @@ public partial class CombatAuthority : Node
         }
         drop.MarkTaken();
         SendLootTaken(dropId, peer);
+        // Loot slice 2 (Vision 8): ward affixes on freshly picked-up gear
+        // grow the peer's absorb pool (server-owned; stacks with the soul
+        // ward — both run through the same _wards dictionary).
+        int gearWard = peer == MyPeerId ? ProgressionSession.DerivedWard : 0;
+        if (gearWard > 0 && !_wards.ContainsKey(peer))
+        {
+            _wards[peer] = gearWard;
+            _wardUntil.Remove(peer);            // gear ward: no expiry
+            SendWardState(peer, gearWard);
+        }
     }
 
     private void SendLootTaken(int dropId, int peer)
@@ -835,11 +866,28 @@ public partial class CombatAuthority : Node
             // Rebuild the item from the drop's seed (same math as _Ready).
             var rng = new RandomNumberGenerator { Seed = drop?.Seed ?? 0 };
             var item = ItemGenerator.Generate(rng, drop?.ItemLevel ?? 1);
-            ProgressionSession.AddLoot(item.Name, ItemGenerator.RarityLabel(item.Rarity));
-            GD.Print($"LOOT TAKEN: {item.Name} ({ItemGenerator.RarityLabel(item.Rarity)}) — session loot {
-                ProgressionSession.Loot.Count}");
+            ProgressionSession.AddLoot(item);
+            EmitSignal(SignalName.LootGranted, item.Name, ItemGenerator.RarityLabel(item.Rarity));
+            GD.Print($"LOOT TAKEN: {item.Name} ({ItemGenerator.RarityLabel(item.Rarity)}, ilvl {item.ItemLevel}, " +
+                     $"{ItemGenerator.AffixList(item)}) — session loot {ProgressionSession.Loot.Count}");
         }
     }
+
+    /// <summary>Client-side equip request (Vision 8): the server just
+    /// REBROADCASTS it so every peer retints the puppet; the item itself is
+    /// session data, not combat state.</summary>
+    public void RequestEquip()
+    {
+        if (Networked)
+            Rpc(nameof(EquipRpc), MyPeerId);
+        else
+            EquipRpc(MyPeerId);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void EquipRpc(int peerId)
+        => EmitSignal(SignalName.EquipmentChanged, peerId);
 
     private void ApplyBuff(int peer, float multiplier)
     {
@@ -863,13 +911,21 @@ public partial class CombatAuthority : Node
                    $"({now - last:0.00}s < {CombatTables.SoulWardCooldown:0.00}s)");
             return;
         }
+        // Gear ward (loot slice 2) sits UNDER the soul ward: the kit cast
+        // replaces the pool while active; the gear pool returns when the
+        // kit ward expires (see _Process ward-expiry branch).
         _lastWardAt[peer] = now;
-        _wards[peer] = CombatTables.SoulWardAbsorb;
+        _wards[peer] = CombatTables.SoulWardAbsorb + peerGearWard(peer);
         _wardUntil[peer] = now + CombatTables.SoulWardDuration;
-        SendWardState(peer, CombatTables.SoulWardAbsorb);
-        GD.Print($"AUTHORITY: ward peer={peer} absorbs {CombatTables.SoulWardAbsorb:0} " +
+        SendWardState(peer, _wards[peer]);
+        GD.Print($"AUTHORITY: ward peer={peer} absorbs {_wards[peer]:0} " +
                  $"for {CombatTables.SoulWardDuration:0}s");
     }
+
+    /// <summary>Gear-ward component of a peer's absorb pool (loot slice 2:
+    /// ward affixes); only the local session's gear is known.</summary>
+    private static int peerGearWard(int peer) =>
+        peer == 1 ? ProgressionSession.DerivedWard : 0;
 
     private void SendWardState(int peerId, float amount)
     {
@@ -919,7 +975,6 @@ public partial class CombatAuthority : Node
         GD.Print($"AUTHORITY: stealth peer={peer} for {CombatTables.StealthDuration:0}s " +
                  $"(next hit x{CombatTables.StealthBonus:0.0})");
     }
-
     private void ValidateAndSpawnSmoke(int peer, Vector3 pos)
     {
         double now = Time.GetTicksMsec() / 1000.0;
@@ -1157,6 +1212,15 @@ public partial class CombatAuthority : Node
                 _wards.Remove(id);
                 SendWardState(id, 0f);
                 GD.Print($"AUTHORITY: ward expired peer={id}");
+                // Loot slice 2 (Vision 8): the gear ward returns after the
+                // kit ward pool expires (it only replaced it while active).
+                int gearWard = id == MyPeerId ? ProgressionSession.DerivedWard : 0;
+                if (gearWard > 0)
+                {
+                    _wards[id] = gearWard;
+                    SendWardState(id, gearWard);
+                    GD.Print($"AUTHORITY: gear ward restored peer={id} ({gearWard})");
+                }
             }
         }
 

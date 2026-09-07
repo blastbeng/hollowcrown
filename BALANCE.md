@@ -111,7 +111,23 @@ Server-authoritative damage, telegraphs 0.5-0.8 s, block -70%, parry window
 
 Session flow (Vision 6.10): card pick stores central XP as the session base;
 match kills add XP server-side (mirror = MatchKills/MatchXp); Leave Realm
--> results screen -> PUT /characters/{id}/progress saves base+match XP.
+-> results screen -> PUT /characters/{id}/progress saves base+match XP
+AND the full session bag as gear_json (loot slice 2).
+
+## Loot affixes (Vision 8 loot slice 2; ItemGenerator.cs + ProgressionSession.cs)
+| name            | value            | notes                                        |
+|-----------------|------------------|----------------------------------------------|
+| rarity_weights  | 50/28/15/5.5/1.5 | common/uncommon/rare/epic/mythic (%)         |
+| affix_pool      | power 1-2/ilvl   | haste 1, vitality 2-3, ward 1-2 per ilvl     |
+| affix_count     | 1/1/2/3/4        | by rarity (common..mythic)                   |
+| drop_ilvl       | 1 + kills/3      | killer's match kills scale the item level    |
+| vitality        | +1 max HP each   | base hp 100 -> DerivedMaxHp = 100 + vitality |
+| power           | +1% damage each  | DerivedDamageMult = 1 + 0.01*power           |
+| ward            | +1 absorb each   | gear ward pool, server-owned, no expiry;     |
+|                 |                  | replaced by soul ward while that is active   |
+| haste           | banked (no effect)| recorded, unused until a consumer lands     |
+| gear_ward_gate  | stacks w/ kit    | gear pool restores after kit ward expires    |
+
 | date       | check                         | result                                  |
 |------------|-------------------------------|------------------------------------------|
 | 2026-09-07 | kill XP award (dummy)         | 2 kills = +50 XP exact (2 x 25), server line |

@@ -230,12 +230,14 @@ public partial class Main : Node3D
             character.Id,
             ProgressionSession.Level,
             (int)ProgressionSession.TotalXp,
-            character.GearJson);
+            ProgressionSession.SerializeGear());
         if (saved is not null)
         {
             _central.SelectedCharacter = saved;
-            results.SetSaveStatus($"progress saved — level {saved.Level}, xp {saved.Xp}", true);
-            GD.Print($"PROGRESS SAVED: character {saved.Id} level={saved.Level} xp={saved.Xp}");
+            results.SetSaveStatus($"progress saved — level {saved.Level}, xp {saved.Xp}, " +
+                                  $"{ProgressionSession.Loot.Count} item(s) in gear", true);
+            GD.Print($"PROGRESS SAVED: character {saved.Id} level={saved.Level} xp={saved.Xp} " +
+                     $"gear={saved.GearJson}");
         }
         else
         {

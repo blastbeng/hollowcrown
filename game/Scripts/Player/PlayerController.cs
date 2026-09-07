@@ -55,7 +55,9 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     // --- Server-authoritative combat mirror (ICombatTarget, Vision 2.3) ---
     // The MATCH SERVER owns this HP number; the local value mirrors what the
     // authority broadcasts and never drives gameplay decisions locally.
-    public int MaxHp => CombatAuthority.PlayerMaxHp;   // BALANCE.md: player_hp
+    // Loot slice 2 (Vision 8): MaxHp includes EQUIPPED vitality affixes —
+    // the server derives the SAME number via CombatAuthority.MaxHpOf.
+    public int MaxHp => ProgressionSession.DerivedMaxHp;   // BALANCE.md: player_hp + vitality
     public int Hp { get; private set; }
     public bool IsDead { get; private set; }
     public bool IsStunned => _stunTimer > 0f;
@@ -213,6 +215,13 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         Hp = MaxHp;
         AddToGroup("combat_targets");   // kit candidate set (dummies + players)
         CombatAuthority.For(this)?.RegisterSelf(this);   // join the authority's world
+        // Loot slice 2 (Vision 8): equipment changes the character's look —
+        // any equip broadcast retints the model (rare+ gear leaves a mark).
+        if (CombatAuthority.For(this) is { } auth)
+        {
+            auth.EquipmentChanged += OnEquipmentChanged;
+            ApplyEquipmentLook();   // restored central gear tints at spawn
+        }
         GD.Print($"PLAYER CONTROLLER READY — {PlayerClassInfo.Label(Class)}: WASD camera-relative, sprint, dodge roll (0.3 s i-frames)");
     }
 
@@ -378,8 +387,11 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         _warcryMultiplier = multiplier;
     }
 
-    /// <summary>Chain damage multiplier while a warcry buff is running.</summary>
-    public float DamageMultiplier => _warcryTimer > 0f ? _warcryMultiplier : 1f;
+    /// <summary>Chain damage multiplier while a warcry buff is running.
+    /// Loot slice 2 (Vision 8): power affixes on equipped gear add their
+    /// damage percent on top (0.01/point — server-side mirror in the kits).</summary>
+    public float DamageMultiplier =>
+        (_warcryTimer > 0f ? _warcryMultiplier : 1f) * ProgressionSession.DerivedDamageMult;
 
     private void UpdateBuffTimers(float delta)
     {
@@ -436,6 +448,26 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         _model?.PlayLocomotion(Velocity.Length(), IsSprinting);
     }
 
+    // ---------------- Equipment visuals (loot slice 2, Vision 8) ----------------
+
+    private void OnEquipmentChanged(int peerId)
+    {
+        if (peerId == PeerId)
+            ApplyEquipmentLook();
+    }
+
+    /// <summary>Equipment changes the character's tint: equipped rare+ gear
+    /// stains the body accent (WardenModel.ApplyEquipmentTint).</summary>
+    private void ApplyEquipmentLook()
+    {
+        var best = ProgressionSession.EquippedItem(ItemGenerator.EquipSlot.Body);
+        _model?.ApplyEquipmentTint(best);
+        string summary = ProgressionSession.AffixSummary();
+        if (summary.Length > 0)
+            GD.Print($"EQUIPMENT ACTIVE: {summary} (max hp {MaxHp}, dmg x{ProgressionSession.DerivedDamageMult:0.00}, " +
+                     $"ward {ProgressionSession.DerivedWard})");
+    }
+
     /// <summary>Rich state for the playtester runtime digest (mcp_watch).</summary>
     public Godot.Collections.Dictionary _mcp_state() => new()
     {
@@ -452,6 +484,10 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         ["match_xp"] = MatchXp,
         ["session_level"] = ProgressionSession.Level,
         ["stamina"] = Stamina,
+        ["gear_max_hp"] = ProgressionSession.DerivedMaxHp,
+        ["gear_damage_mult"] = ProgressionSession.DerivedDamageMult,
+        ["gear_ward"] = ProgressionSession.DerivedWard,
+        ["bag_count"] = ProgressionSession.Loot.Count,
         ["sprinting"] = IsSprinting,
         ["dodging"] = IsDodging,
         ["invulnerable"] = IsInvulnerable,

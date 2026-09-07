@@ -459,6 +459,29 @@ public partial class WardenModel : Node3D
             SetFadeAlpha(_ghostAlpha);
     }
 
+    // --------------------- Equipment visuals (loot slice 2) -------------------
+
+    /// <summary>Loot slice 2 (Vision 8): equipment changes the character's
+    /// look. The equipped BODY item's rarity stains the body-tint accent —
+    /// rare = blue sheen, epic = violet, mythic = ember-gold; common/
+    /// uncommon gear keeps the class tint. Rarity IS the tell at iso zoom.
+    /// </summary>
+    public void ApplyEquipmentTint(Hollowcrown.Save.ItemGenerator.Item? item)
+    {
+        if (_bodyMaterial is null || item is null ||
+            (int)item.Rarity < (int)Hollowcrown.Save.ItemGenerator.Rarity.Rare)
+            return;
+        // Fold the rarity color INTO the shader tint (keeps the luminance
+        // math, shifts the accent) — mixed ~40% so the class still reads.
+        Color rarity = Hollowcrown.Save.ItemGenerator.RarityColor(item.Rarity);
+        Color baseTint = ClassBodyTint();
+        Color mixed = baseTint.Lerp(rarity, 0.4f);
+        _bodyMaterial.SetShaderParameter("tint", mixed);
+        GD.Print($"EQUIPMENT TINT: {item.Name} " +
+                 $"({Hollowcrown.Save.ItemGenerator.RarityLabel(item.Rarity)}) " +
+                 $"stains the {PlayerClassInfo.Label(ClassVariant)}");
+    }
+
     /// <summary>Death01 one-shot; the pose freezes and the body fades.</summary>
     public void PlayDeath(float fadeAlpha)
     {

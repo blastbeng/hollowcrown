@@ -64,8 +64,12 @@ public partial class ArenaHud : CanvasLayer
         BuildTargetFrame(root);
         BuildKillFeed(root);
         BuildLevelRow(root);
+        BuildInventoryButton(root);
         if (CombatAuthority.For(this) is { } auth)
+        {
             auth.KillFeed += AddKillFeed;   // server-broadcast killfeed
+            auth.LootGranted += OnLootGranted;   // loot slice 2 pickup toast
+        }
         GD.Print($"ARENA HUD READY — {_slots.Count} ability slots, stamina, target frame, killfeed, XP row");
     }
 
@@ -114,6 +118,55 @@ public partial class ArenaHud : CanvasLayer
     /// <summary>Fired by the Leave Realm button — Main shows the results
     /// screen and saves progression to central (Vision 6.10 flow).</summary>
     [Signal] public delegate void LeaveRealmEventHandler();
+
+    // ---------------------- Inventory (loot slice 2) -----------------------
+
+    private CanvasLayer? _inventory;
+    private Label? _lootToast;
+    private float _lootToastAge;
+
+    private void BuildInventoryButton(Control root)
+    {
+        var btn = new Button { Text = "Inventory (Tab)" };
+        btn.AnchorLeft = 0f; btn.AnchorRight = 0f;
+        btn.AnchorTop = 0f; btn.AnchorBottom = 0f;
+        btn.OffsetLeft = 12f; btn.OffsetRight = 208f;
+        btn.OffsetTop = 78f; btn.OffsetBottom = 104f;
+        btn.Pressed += ToggleInventory;
+        root.AddChild(btn);
+    }
+
+    /// <summary>Open/close the inventory panel (button or Tab action).</summary>
+    public void ToggleInventory()
+    {
+        _inventory ??= new UI.InventoryPanel { Name = "InventoryPanel" };
+        AddChild(_inventory);
+        if (_inventory is UI.InventoryPanel panel)
+            panel.Toggle();
+    }
+
+    private void OnLootGranted(string itemName, string rarity)
+    {
+        _lootToast ??= MakeLootToast();
+        _lootToast.Text = $"+ {itemName} ({rarity})";
+        _lootToastAge = 0f;
+        _lootToast.Visible = true;
+    }
+
+    private Label MakeLootToast()
+    {
+        var label = new Label
+        {
+            Visible = false,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        label.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterTop);
+        label.OffsetTop = 90f; label.OffsetBottom = 118f;
+        label.OffsetLeft = -220f; label.OffsetRight = 220f;
+        label.AddThemeFontSizeOverride("font_size", 16);
+        AddChild(label);
+        return label;
+    }
 
     // ------------------------------ Ability bar ---------------------------
 
@@ -342,6 +395,16 @@ public partial class ArenaHud : CanvasLayer
 
     public override void _Process(double delta)
     {
+        // Loot toast fade (loot slice 2): visible 2.5 s, gone by 3.5 s.
+        if (_lootToast is { Visible: true })
+        {
+            _lootToastAge += (float)delta;
+            _lootToast.Modulate = new Color(1, 1, 1,
+                _lootToastAge > 2.5f ? Mathf.Clamp(1f - (_lootToastAge - 2.5f), 0f, 1f) : 1f);
+            if (_lootToastAge > 3.5f)
+                _lootToast.Visible = false;
+        }
+
         // HP + stamina (real state; HP mirrors the match server).
         _hpBar.MaxValue = _pc.MaxHp;
         _hpBar.Value = _pc.Hp;
