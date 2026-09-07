@@ -169,22 +169,19 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Arena polish remainder: gothic arches (store assets or Blender), banner
-   sway, chains/cobwebs (6.7), ember mote tuning (currently reads as glow —
-   want distinct rising sparks). (Rubble ~2x DONE, verified on screen.)
-2. XP/leveling + progression sync to central + results screen; while there:
+1. XP/leveling + progression sync to central + results screen; while there:
    character-select card click should set PlayerController.PendingClass +
    CombatAuthority.PendingClass (classes are boot-flag only right now).
-3. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-4. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
+2. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+3. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
    Vision 4 wants match-server tokens for /servers/heartbeat + PUT progress
    — land them here).
-5. Skirmish mode (3v3) + team spawns/score.
-6. Open world zone: village chunks, shrines, roaming elites, minimap.
-7. Matchmaking quick-play flow via central.
-8. Atmosphere pass 2: ambience audio, fog drift, fireflies.
-9. Windows + Linux export presets + dedicated server headless export.
-10. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
+4. Skirmish mode (3v3) + team spawns/score.
+5. Open world zone: village chunks, shrines, roaming elites, minimap.
+6. Matchmaking quick-play flow via central.
+7. Atmosphere pass 2: ambience audio, fog drift, fireflies.
+8. Windows + Linux export presets + dedicated server headless export.
+9. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
     session 9 also saw a client ENet peer go INACTIVE while Networked==true,
     spewing "multiplayer instance isn't currently active" each frame: detect
     and recover), position-report trust checks (anti-cheat: shadow step is
@@ -193,9 +190,48 @@ compile check (remote or local):
     swings/casts yet — only locomotion/hit/death), root/stealth visuals on
     remote puppets (root is server-applied but only the LOCAL body locks;
     RemoteAvatar.OnRooted is a no-op stub).
-11. Harness v2 (optional): full 3x3 class matrix in one run (3 bots, last-
+10. Harness v2 (optional): full 3x3 class matrix in one run (3 bots, last-
     standing scoring), per-matchup 45-55% tuning with kits (dodge/block use
     needs a smarter bot brain than chain-spam), CI hook in tools/test.sh.
+11. Arena polish leftovers (small): second banner palette on the far ring
+    side, cobwebs under the arch lintels (currently high corners only),
+    Prop_Crate/MetalFence kit pieces placed as spawn-side dressing (already
+    committed in the lean subset, unused on screen yet).
+
+SESSION 12 NOTE (2026-09-07) — ARENA POLISH DONE and verified on screen
+(Vision 6.6/6.7; was NEXT TASKS 1). Assets: Quaternius Medieval Village
+MegaKit via the NEW store MCP (store_search/store_get_asset/
+store_download_asset, 161 MB), CC0 license verified via quaternius.com
+before install; LEAN subset only (Wall_Arch, Wall_Plaster_Straight,
+Prop_MetalFence_Ornament, Prop_Crate + T_WoodTrim/T_Plaster/
+T_MetalOrnaments textures, 18 MB) copied to game/assets/models/
+medieval_kit/ — kit .gltf reference their textures RELATIVE, so textures
+must sit beside the models. ATTRIBUTION.md line added. New ArenaTest:
+BuildArches (4 Wall_Arch panels 2x3 m flanking west/east, one broken —
+sunk 0.15 m, tipped 4 deg; walkable opening = two 0.5 m leg colliders +
+0.8 m lintel box; occluder group) + BuildBannersAndDetails (Banner.cs:
+war banners 3.2 m pole + 0.9x1.5 m cloth with sin() yaw/roll sway driver,
+blood #7a1414 + cold-steel #4a4f5a with gold #b08d57 chevron; hanging
+torus chains under 3 lintels; 3 cobweb quads alpha 0.12). Embers RETUNED
+to distinct sparks ( hotter core #ffb14d, burst 1.6-2.8 m/s, turbulence
+0.12 wander, size-shrink wink-out). EVIDENCE: screenshots judged vs
+Section 6 — WIDE zoom-16 shot reads dark fantasy (stone arches + breach
+banner + chains + ember pools + obelisk + rain), HUD live, zero errors.
+FIXES found by testing: (a) .gltf imports as PackedScene — GD.Load<Mesh>
+THREW and killed the arena build after the obelisk (arches/banners/player
+never spawned; caught by exec tree walk + ARCH MISSING); scene-instantiate
+now. (b) Kit panels shipped wood-trim materials and read as WOODEN frames
+on screen — RetintToStone re-skins every mesh to MaterialFactory.
+WallStone (Vision 6.3 palette rule). GOTCHAS (session 12): (38) kit .gltf
++ their .bin + textures must sit in the SAME folder (relative URIs).
+(39) .gltf = PackedScene in Godot 4.x — never GD.Load<Mesh> a gltf.
+(40) stop+run does NOT pull — after commits run tools/remote_test.sh
+FIRST, else the remote runs old code (session 2 gotcha, bit again).
+(41) Godot auto-renames duplicate siblings (Arch -> @StaticBody3D@N):
+count by type/position, not by name prefix. (42)
+ParticleProcessMaterial.TurbulenceNoiseScale is FLOAT,
+TurbulenceInfluence is VECTOR2 (opposite of what intuition says).
+NEXT: XP/leveling + central progression sync (NEXT TASKS 1).
 
 SESSION 11 NOTE (2026-09-07) — BALANCE HARNESS v1 DONE and verified end-to-end
 (Vision 7, was NEXT TASKS 1). CombatBot.cs: headless CharacterBody3D bot
