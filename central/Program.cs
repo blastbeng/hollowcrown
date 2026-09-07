@@ -315,8 +315,12 @@ app.MapPost("/mmr/report", (HttpRequest req, MmrReport r) =>
     var (winDelta, loseDelta) = Hollowcrown.Shared.Rating.Update(winnerMmr, loserMmr);
     int winnerAfter = Hollowcrown.Shared.Rating.Apply(winnerMmr, winDelta);
     int loserAfter = Hollowcrown.Shared.Rating.Apply(loserMmr, loseDelta);
-    conn.Exec("UPDATE characters SET mmr = $m WHERE id IN ($w, $l)",
-        ("$m", winnerAfter), ("$w", winnerId), ("$l", loserId));
+    // Per-character update — a single UPDATE ... IN (w, l) would stamp the
+    // WINNER's rating on both rows (found live: the loser kept 1016).
+    conn.Exec("UPDATE characters SET mmr = $m WHERE id = $c",
+        ("$m", winnerAfter), ("$c", winnerId));
+    conn.Exec("UPDATE characters SET mmr = $m WHERE id = $c",
+        ("$m", loserAfter), ("$c", loserId));
 
     return Results.Json(new MmrResult(
         (int)winnerId.Value, (int)loserId.Value, winnerAfter, loserAfter,
