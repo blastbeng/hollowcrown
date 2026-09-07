@@ -159,7 +159,17 @@ public partial class CentralClient : Node
     {
         try
         {
-            using var resp = await Http.PostAsJsonAsync($"{EffectiveBaseUrl}/mmr/report", report, JsonOpts);
+            // Vision 4: central requires the server token as the BEARER on
+            // /mmr/report (found live: a body-only token is a 403).
+            using var msg = new HttpRequestMessage(HttpMethod.Post, $"{EffectiveBaseUrl}/mmr/report")
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(report, JsonOpts),
+                    System.Text.Encoding.UTF8, "application/json"),
+            };
+            if (CombatAuthority.ServerToken.Length > 0)
+                msg.Headers.Authorization = new AuthenticationHeaderValue("Bearer", CombatAuthority.ServerToken);
+            using var resp = await Http.SendAsync(msg);
             return resp.IsSuccessStatusCode
                 ? await resp.Content.ReadFromJsonAsync<MmrResult>(JsonOpts)
                 : null;
