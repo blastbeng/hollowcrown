@@ -126,17 +126,32 @@ local godot /opt/godot/bin/godot).
   ATTRIBUTION.md: name, author, license, URL. Retint assets toward the
   palette so art direction stays consistent. Commit asset files + .import
   metadata.
-- Blender MCP: runs ON THE REMOTE HOST (192.168.1.29) as a systemd service —
-  `sudo systemctl start blender-mcp` (autostarts whenever the host is online);
-  probe availability at session start (one cheap call). It is reachable ONLY
-  while that host is up: when the host is offline there is NO fallback
-  Blender MCP anywhere. WHEN AVAILABLE you MUST use it for custom meshes the
-  store lacks or for store assets that need Blender work (merge/retarget/
-  retint/repair, kit piece variants): statues, braziers, gates, broken walls,
-  weapons, class armor pieces. Export .glb to `game/assets/models/`, commit,
-  note "blender-mcp" in the commit message. WHEN UNAVAILABLE (host offline or
-  service down): fall back to store assets or primitives and say so in the
-  commit message.
+- blender: MCP plugin runs ON THE REMOTE HOST (192.168.1.29) as a systemd
+  service — `sudo systemctl start blender-mcp` (autostarts whenever the host
+  is online); probe availability at session start (one cheap call). It is
+  reachable ONLY while that host is up: when the host is offline there is NO
+  fallback Blender MCP anywhere. WHEN AVAILABLE you MUST use it for custom
+  meshes the store lacks or for store assets that need Blender work
+  (merge/retarget/retint/repair, kit piece variants): statues, braziers,
+  gates, broken walls, weapons, class armor pieces. Export .glb to
+  `game/assets/models/`, commit, note "blender-mcp" in the commit message.
+  WHEN UNAVAILABLE (host offline or service down): fall back to store assets
+  or primitives and say so in the commit message.
+  SESSION-16 TEST RESULTS (verified working): execute_code, get_scene_info,
+  get_object_info, glTF .glb export all WORK. get_viewport_screenshot is
+  BROKEN by design in this deployment: the MCP server runs LOCALLY (uvx) and
+  the addon on the REMOTE host, so the server asks the addon to write the
+  screenshot to a LOCAL temp path, the addon writes it to the REMOTE /tmp,
+  and the server never finds the file ("Screenshot file was not created").
+  WORKAROUND (proven): drive the capture via execute_blender_code —
+  gpu.types.GPUOffScreen(...).draw_view3d(...) + numpy (apt python3-numpy is
+  installed on the host; numpy 2.3.5 visible in Blender's /usr/bin/python3.14)
+  -> save PNG to a REMOTE /tmp path -> scp/ssh it over, or read pixel stats
+  directly. Do NOT burn time on the screenshot tool again; the code path is
+  verified. Also note: Blender runs under xvfb-run (headless-style), so the
+  window-grab fallback captures all-black frames — the offscreen path is the
+  only valid one. Draco mesh compression is unavailable in this Blender
+  build (export without it — the gltf exporter errors but still writes).
 - Web search: verify Godot 4 API names/signatures for anything uncommon
   (versions drift — never trust memory for exact enum/API names).
 - GitHub search: reference implementations (headless dedicated servers, Elo,
