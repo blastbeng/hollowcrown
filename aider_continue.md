@@ -169,18 +169,15 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Loot slice 3 (small): weapon-slot drops (Blade/Dagger/Staff currently map
-   to Body in BaseSlots — give them a Weapon slot + attach the mesh),
-   affix haste consumer (banked in BALANCE.md, no effect yet), unequip UX.
-2. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
+1. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
    Vision 4 wants match-server tokens for /servers/heartbeat + PUT progress
    — land them here).
-3. Skirmish mode (3v3) + team spawns/score.
-4. Open world zone: village chunks, shrines, roaming elites, minimap.
-5. Matchmaking quick-play flow via central.
-6. Atmosphere pass 2: ambience audio, fog drift, fireflies.
-7. Windows + Linux export presets + dedicated server headless export.
-8. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
+2. Skirmish mode (3v3) + team spawns/score.
+3. Open world zone: village chunks, shrines, roaming elites, minimap.
+4. Matchmaking quick-play flow via central.
+5. Atmosphere pass 2: ambience audio, fog drift, fireflies.
+6. Windows + Linux export presets + dedicated server headless export.
+7. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
     session 9 also saw a client ENet peer go INACTIVE while Networked==true,
     spewing "multiplayer instance isn't currently active" each frame: detect
     and recover), position-report trust checks (anti-cheat: shadow step is
@@ -188,14 +185,84 @@ compile check (remote or local):
     bars over REMOTE avatars, attack-cast relay (puppets can't show remote
     swings/casts yet — only locomotion/hit/death), root/stealth visuals on
     remote puppets (root is server-applied but only the LOCAL body locks;
-    RemoteAvatar.OnRooted is a no-op stub).
-9. Harness v2 (optional): full 3x3 class matrix in one run (3 bots, last-
+    RemoteAvatar.OnRooted is a no-op stub), REMOTE-PEER GEAR GAP (vitality/
+    ward/haste derive from the LOCAL session only — a dedicated server sees
+    plain 100 hp / no haste for remote peers; fix = handshake gear report
+    signed by the match server or central-sourced gear at spawn approval).
+8. Harness v2 (optional): full 3x3 class matrix in one run (3 bots, last-
     standing scoring), per-matchup 45-55% tuning with kits (dodge/block use
     needs a smarter bot brain than chain-spam), CI hook in tools/test.sh.
-10. Arena polish leftovers (small): second banner palette on the far ring
+9. Arena polish leftovers (small): second banner palette on the far ring
     side, cobwebs under the arch lintels (currently high corners only),
     Prop_Crate/MetalFence kit pieces placed as spawn-side dressing (already
-    committed in the lean subset, unused on screen yet).
+    committed in the lean subset, unused on screen yet); results-screen
+    common-row tint reads violet under the dim overlay (should be bone/steel
+    — verify the row color logic); offline target frame kept a stale hp
+    mirror through the A/B haste test.
+
+SESSION 15 NOTE (2026-09-07) — LOOT SLICE 3 DONE, all verified end-to-end
+(Vision 8; was NEXT TASKS 1). WEAPON SLOT: ItemGenerator.EquipSlot grew
+Weapon; BaseSlots maps Blade/Dagger/Staff -> Weapon (ToJson already wrote
+the slot, FromJson tolerates it — old Body-slot weapon items keep working).
+WEAPON VISUALS: WardenModel.ApplyEquippedWeapon(item) — the loot weapon is a
+procedural mesh (greatsword 1.25m blade / dagger 0.28m / staff 1.7m + gem,
+Vision 6.4 scale) attached to the PRIMARY hand socket; class-default weapon
+meshes (the DIRECT MeshInstance3D children of the sockets) hide while it is
+carried and return on unequip; the shield hides too (weapon-carrying read);
+rare+ steel lerps 40% toward the rarity color. Sockets record themselves in
+_Attach* (_primarySocket/_secondarySocket). Applied at spawn, on equip AND
+on unequip via the existing EquipmentChanged broadcast (RequestEquip ->
+EquipRpc, AnyPeer). UNEQUIP UX: ProgressionSession.Unequip(slot) (item
+returns to the bag — the bag IS the persistence source) + per-slot Unequip
+buttons in InventoryPanel; stat summary now shows "haste N / swing -X.XXs".
+HASTE CONSUMER (server-side, BALANCE.md): CombatAuthority.ValidateAndApply
+shrinks the per-peer attack MinInterval by 0.01 s per haste point, capped at
+half speed (HastePerPoint/HasteCapMultiplier in CombatTables); the client
+cadence is untouched — the SERVER cooldown check admits requests sooner.
+APPLIES ONLY WHERE THE ATTACKER'S SESSION == THE AUTHORITY SESSION (offline /
+local / listen-host / bots 500-999) — a dedicated server does NOT know remote
+peers' session gear (same accepted gap as vitality/ward in slice 2; recorded
+as a robustness item: handshake gear report or central-sourced gear).
+EVIDENCE (dedicated server 7777 + playtester client, then offline flip for
+the haste A/B): kill -> drop (Hollow Dagger of the Pale Court common +1
+power) -> pickup -> inventory shows Weapon: — row -> Equip -> node-tree proof
+(SwordSocket: 3 class meshes vis=false, LootWeapon 3 meshes vis=true;
+ShieldSocket 2 meshes vis=false) -> Unequip -> LootWeapon freed, class sword
++ shield meshes vis=true again, Weapon: — restored, dmg x1.01 -> x1.00.
+Second kill (Rotted Dagger +1 ward), third kill (Ashen Blade of Withering
+RARE ilvl2 +2 power +2 haste) -> equip -> gear_haste=2, dmg x1.02 live.
+HASTE A/B (offline authority, cooldown gate = MinInterval*mult - 0.05):
+hit A lands (80->60); 247 ms wall-clock gap -> hit B ACCEPTED (60->40;
+0.247 > 0.244 haste-2 gate); immediate hit C REJECTED. Negative control:
+unequip haste (haste=0, gate 0.25) -> same 247 ms hit REJECTED (hp stayed
+20). So the haste affix alone flips the 247 ms gate. RESULTS + CENTRAL:
+Leave Realm -> MATCH RESULTS (kills 3, xp +75, 3 items with affix rows,
+rare row blue) -> "progress saved — level 1, xp 75, 3 item(s) in gear" ->
+central GET /characters: gear_json = 3 items ALL "slot":"Weapon"
+(incl. "haste:2"). Zero script errors; screenshots judged vs Section 6
+(WIDE iso dusk arena with rain/braziers/banners + HUD, ground-projected arc
+telegraph + target frame on the frozen swing, palette-correct inventory
+panels, results rows).
+COMMITS 383d03f (loot slice 3) + ffcc685 (bare-hands fix) + this docs commit.
+GOTCHAS (session 15): (51) Hiding a socket (Visible=false) hides the loot
+weapon child TOO — bare hands on screen; hide only the socket's class-default
+MeshInstance children (fixed in ffcc685). (52) exec GDScript: .visible throws
+on non-Node3D (AnimationPlayer) — guard `is Node3D`; chain.Swing() callable
+works; busy-wait loops inside exec block the main thread (fine for <300 ms
+timing probes). (53) Frozen screenshots can lag exec state changes — step a
+few frames or thaw before screenshot_game; the iso rig lerps toward the
+player every STEP frame (snap + shoot immediately), and the pitch -50 look
+point sits rig + (0,0,+2.04): the player renders ~2 m ABOVE screen center at
+settle — not a bug, the verified session-4 rig. (54) Dedicated-server haste
+gap: REJECT floor stayed 0,30s for the remote peer because the DS process's
+ProgressionSession is empty — flip the client offline in place
+(MultiplayerPeer -> OfflineMultiplayerPeer; session gear survives) to test
+the consumer honestly. (55) Injected Q/attack inputs still never reach the
+C# chains in this build; Swing()/RequestHit direct calls are the driver.
+(56) sqlite3 CLI is missing on the remote — verify central via curl
+(auth/login -> Bearer token -> GET /characters). (57) ToggleInventory twice
+in one exec logs a harmless "already has a parent" warning (panel reuse).
+NEXT: MMR/Elo + leaderboard (NEXT TASKS 1).
 
 SESSION 14 NOTE (2026-09-07) — LOOT SLICE 2 DONE, all verified end-to-end
 (Vision 8; was NEXT TASKS 1). INVENTORY/EQUIP UI: InventoryPanel.cs (Canvas
