@@ -487,18 +487,17 @@ public partial class WardenModel : Node3D
             _weaponOverride.QueueFree();
             _weaponOverride = null;
         }
+        // Class-default weapon meshes are the DIRECT MeshInstance3D children
+        // of the sockets; the loot weapon attaches to the same socket, so the
+        // sockets themselves must STAY visible (a hidden parent hides the
+        // loot weapon too — found on the playtester, bare-hands bug).
+        SetSocketWeaponMeshes(_primarySocket, item is null);
+        SetSocketWeaponMeshes(_secondarySocket, item is null);
         if (item is null)
         {
-            // Class defaults back on (sockets are always built in _Ready).
-            if (_primarySocket is not null) _primarySocket.Visible = true;
-            if (_secondarySocket is not null) _secondarySocket.Visible = true;
             GD.Print($"WEAPON EQUIP: class default restored ({WeaponSummary()})");
             return;
         }
-        // Hide the class-default primary (and the twin/hood pair where the
-        // socket model used two pieces) while the loot weapon is carried.
-        if (_primarySocket is not null) _primarySocket.Visible = false;
-        if (_secondarySocket is not null) _secondarySocket.Visible = false;
 
         _weaponOverride = BuildLootWeapon(item);
         if (_primarySocket is not null)
@@ -506,6 +505,15 @@ public partial class WardenModel : Node3D
         GD.Print($"WEAPON EQUIP: {item.Name} " +
                  $"({Hollowcrown.Save.ItemGenerator.RarityLabel(item.Rarity)}) " +
                  $"attaches to the hand socket ({WeaponKind(item.Name)})");
+    }
+
+    private static void SetSocketWeaponMeshes(Node3D? socket, bool visible)
+    {
+        if (socket is null)
+            return;
+        foreach (var child in socket.GetChildren())
+            if (child is MeshInstance3D mesh)
+                mesh.Visible = visible;
     }
 
     private static string WeaponKind(string name)
