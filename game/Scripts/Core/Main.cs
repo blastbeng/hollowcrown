@@ -2,6 +2,7 @@ using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Networking;
 using Hollowcrown.Player;
+using Hollowcrown.Save;
 using Hollowcrown.UI;
 using Hollowcrown.World;
 
@@ -172,7 +173,74 @@ public partial class Main : Node3D
             _browser.Visible = true;
         };
 
+        // Vision 6.10 flow: picking a champion card arms the class + session
+        // and goes to the server browser (no more pickless path).
+        _characters.CharacterPicked += _ =>
+        {
+            _central.SelectedCharacter = _characters.LastPicked;
+            _characters.Visible = false;
+            _browser.Visible = true;
+        };
+
         GD.Print("HOLLOWCROWN BOOT OK — C# assembly loaded, main scene ready");
+    }
+
+    /// <summary>Leave the realm (ArenaHud button): show the results screen
+    /// over the arena, save progression to central, then return to the
+    /// character select (Vision 6.10 flow: match -> results -> characters).
+    /// </summary>
+    private void LeaveRealm()
+    {
+        var results = new ResultsScreen { Name = "Results" };
+        results.Closed += () =>
+        {
+            results.QueueFree();
+            // Reset combat + session so the next match starts clean.
+            if (GetNodeOrNull("CombatAuthority") is Node authority)
+                authority.QueueFree();
+            if (GetNodeOrNull("Arena") is Node arena)
+                arena.QueueFree();
+            Multiplayer.MultiplayerPeer = new OfflineMultiplayerPeer();
+            ProgressionSession.ResetMatch();
+            PlayerController.PendingClass = PlayerClass.Warden;
+            CombatAuthority.PendingClass = "warden";
+            if (_ui is not null)
+            {
+                _ui.Visible = true;
+                _browser.Visible = false;
+                _characters.Visible = true;
+            }
+        };
+        AddChild(results, forceReadableName: true);
+
+        // Central round-trip (Vision 8 gate 7): save the new XP, then show
+        // the outcome on the results screen.
+        _ = SaveProgressionToCentral(results);
+    }
+
+    private async System.Threading.Tasks.Task SaveProgressionToCentral(ResultsScreen results)
+    {
+        var character = _central?.SelectedCharacter;
+        if (character is null || !(_central?.IsAuthenticated ?? false))
+        {
+            results.SetSaveStatus("not saved — no central character selected", false);
+            return;
+        }
+        var saved = await _central.SaveProgress(
+            character.Id,
+            ProgressionSession.Level,
+            (int)ProgressionSession.TotalXp,
+            character.GearJson);
+        if (saved is not null)
+        {
+            _central.SelectedCharacter = saved;
+            results.SetSaveStatus($"progress saved — level {saved.Level}, xp {saved.Xp}", true);
+            GD.Print($"PROGRESS SAVED: character {saved.Id} level={saved.Level} xp={saved.Xp}");
+        }
+        else
+        {
+            results.SetSaveStatus("save FAILED — central unreachable", false);
+        }
     }
 
     /// <summary>Direct-IP realm join (Vision 1: direct join is always
@@ -205,6 +273,9 @@ public partial class Main : Node3D
         AddCombatAuthority();
         if (GetNodeOrNull<Node3D>("Arena") is null)
             AddChild(new ArenaTest { Name = "Arena" }, forceReadableName: true);
+        // Results flow (Vision 6.10): the HUD's Leave Realm button lands here.
+        if (GetNodeOrNull("Arena/ArenaHud") is UI.ArenaHud hud)
+            hud.LeaveRealm += LeaveRealm;
         // The --join launch path calls JoinRealm from _Ready before any menu
         // UI exists — only hide the menus when they were built.
         if (_ui is not null)

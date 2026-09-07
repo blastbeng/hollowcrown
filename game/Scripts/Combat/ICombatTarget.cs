@@ -55,4 +55,9 @@ public interface ICombatTarget
     /// <summary>Authority broadcast: back at full HP, placed at the target's
     /// spawn point (players teleport; static targets ignore the position).</summary>
     void OnRespawned(int hpAfter, Vector3 spawnPos);
+
+    /// <summary>Authority broadcast (Vision 8): kill + XP counters for the
+    /// LOCAL player's mirror — the HUD/results read this. Most targets
+    /// ignore it.</summary>
+    void OnProgress(int kills, int xp);
 }

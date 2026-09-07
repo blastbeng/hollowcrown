@@ -174,4 +174,9 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
         _lastPos = spawnPos;
         GD.Print($"REMOTE AVATAR RESPAWNED — {DisplayName} at {spawnPos}");
     }
+
+    public void OnProgress(int kills, int xp)
+    {
+        // Puppets don't own progression — the owning client mirrors its own.
+    }
 }

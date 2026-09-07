@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Player;
+using Hollowcrown.Save;
 
 namespace Hollowcrown.Networking;
 
@@ -89,6 +90,7 @@ public partial class CombatAuthority : Node
         public void OnHealed(int hpAfter) { }
         public void OnKilled() { }
         public void OnRespawned(int hpAfter, Vector3 spawnPos) { }
+        public void OnProgress(int kills, int xp) { }
     }
 
     private readonly Dictionary<int, PeerInfo> _peers = new();
@@ -106,6 +108,10 @@ public partial class CombatAuthority : Node
     private readonly Dictionary<int, float> _wards = new();          // absorb pools
     private readonly Dictionary<int, double> _wardUntil = new();
     private readonly Dictionary<int, double> _lastWardAt = new();
+    // Progression (Vision 8): kills + XP per combat id — server-owned, the
+    // local player's mirror feeds the HUD and the results screen.
+    private readonly Dictionary<int, int> _kills = new();
+    private readonly Dictionary<int, int> _xp = new();
     private int _nextSmokeZone;
     private int _nextId = 1000;                      // static world targets
     private int _spawnCounter;
@@ -687,6 +693,7 @@ public partial class CombatAuthority : Node
         {
             SendKillFeed($"{PeerName(attackerPeer)} slew {victim.DisplayName}");
             _respawnAt[victimId] = now + RespawnDelay;
+            AwardKillXp(attackerPeer, victimId, victim);
             GD.Print($"AUTHORITY: KILL attacker={PeerName(attackerPeer)} " +
                      $"victim={victim.DisplayName}");
         }
@@ -696,6 +703,34 @@ public partial class CombatAuthority : Node
     }
 
     private void Reject(string reason) => GD.Print($"AUTHORITY REJECT: {reason}");
+
+    /// <summary>Vision 8: XP from kills — server-owned number (clients never
+    /// compute rewards). Dummies award less than players; the award is
+    /// broadcast to every peer so the LOCAL player's mirror + HUD stay live.</summary>
+    private void AwardKillXp(int attackerPeer, int victimId, ICombatTarget victim)
+    {
+        int xp = victimId >= 1000 ? Progression.XpPerDummyKill : Progression.XpPerPlayerKill;
+        _kills[attackerPeer] = _kills.TryGetValue(attackerPeer, out int k) ? k + 1 : 1;
+        _xp[attackerPeer] = _xp.TryGetValue(attackerPeer, out int x) ? x + xp : xp;
+        SendProgress(attackerPeer, _kills[attackerPeer], _xp[attackerPeer]);
+        GD.Print($"AUTHORITY: XP attacker={attackerPeer} +{xp} xp (kills={_kills[attackerPeer]})");
+    }
+
+    private void SendProgress(int peerId, int kills, int xp)
+    {
+        if (Networked)
+            Rpc(nameof(ProgressRpc), peerId, kills, xp);
+        else
+            ProgressRpc(peerId, kills, xp);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void ProgressRpc(int peerId, int kills, int xp)
+    {
+        if (_targets.TryGetValue(peerId, out var target))
+            target.OnProgress(kills, xp);
+    }
 
     private void ApplyBuff(int peer, float multiplier)
     {
@@ -1023,6 +1058,8 @@ public partial class CombatAuthority : Node
     /// <summary>Rich state for the playtester runtime digest (mcp_watch).</summary>
     public Godot.Collections.Dictionary _mcp_state() => new()
     {
+        ["kills"] = _kills.TryGetValue(MyPeerId, out int mk) ? mk : 0,
+        ["xp"] = _xp.TryGetValue(MyPeerId, out int mx) ? mx : 0,
         ["authority"] = IsAuthorityMode,
         ["networked"] = Networked,
         ["peer_id"] = MyPeerId,

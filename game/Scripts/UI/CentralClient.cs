@@ -108,6 +108,10 @@ public partial class CentralClient : Node
         }
     }
 
+    /// <summary>Character the user picked on the character-select screen
+    /// (Vision 6.10): the progression session + class flow read this.</summary>
+    public CharacterDto? SelectedCharacter { get; set; }
+
     public async Task<List<ServerInfo>?> ListServers(string mode = "")
     {
         var query = mode.Length > 0 ? $"?mode={Uri.EscapeDataString(mode)}" : "";

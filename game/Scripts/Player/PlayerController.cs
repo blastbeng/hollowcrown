@@ -1,6 +1,7 @@
 using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Networking;
+using Hollowcrown.Save;
 using Hollowcrown.World;
 
 namespace Hollowcrown.Player;
@@ -63,6 +64,19 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     public int CombatId => PeerId;
     public Vector3 CombatPosition => GlobalPosition;
     public string DisplayName => $"{PlayerClassInfo.Label(Class)}#{PeerId}";
+
+    // Progression mirror (Vision 8): server-broadcast kill + XP counters.
+    public int MatchKills { get; private set; }
+    public int MatchXp { get; private set; }
+
+    public void OnProgress(int kills, int xp)
+    {
+        MatchKills = kills;
+        MatchXp = xp;
+        ProgressionSession.MatchKills = kills;
+        ProgressionSession.MatchXp = xp;
+        GD.Print($"{PlayerClassInfo.Label(Class)} PROGRESS {kills} kills, {xp} xp");
+    }
 
     private const float FallDuration = 0.45f;
     private float _stunTimer, _fallTimer, _rootTimer;
@@ -434,6 +448,9 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         ["stealthed"] = IsStealthed,
         ["rooted"] = IsRooted,
         ["ward"] = WardAmount,
+        ["kills"] = MatchKills,
+        ["match_xp"] = MatchXp,
+        ["session_level"] = ProgressionSession.Level,
         ["stamina"] = Stamina,
         ["sprinting"] = IsSprinting,
         ["dodging"] = IsDodging,

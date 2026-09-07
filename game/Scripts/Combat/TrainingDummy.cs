@@ -151,6 +151,11 @@ public partial class TrainingDummy : StaticBody3D, ICombatTarget
         GD.Print("TRAINING DUMMY RESPAWNED (authority) — full HP");
     }
 
+    public void OnProgress(int kills, int xp)
+    {
+        // Static targets never earn progression.
+    }
+
     // ------------------------------ presentation ---------------------------
 
     public override void _Process(double deltaRaw)

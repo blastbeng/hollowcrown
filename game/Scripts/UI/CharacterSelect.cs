@@ -1,4 +1,8 @@
 using Godot;
+using Hollowcrown.Combat;
+using Hollowcrown.Networking;
+using Hollowcrown.Player;
+using Hollowcrown.Save;
 using System.Threading.Tasks;
 using Hollowcrown.Shared;
 
@@ -9,11 +13,19 @@ public partial class CharacterSelect : Control
 {
     [Signal] public delegate void OpenServerBrowserEventHandler();
 
+    /// <summary>Fired when a champion card is picked (Vision 6.10: select ->
+    /// server browser). Main wires this to the realm flow.</summary>
+    [Signal] public delegate void CharacterPickedEventHandler(string name);
+
     private CentralClient _central = null!;
     private VBoxContainer _cards = null!;
     private LineEdit _newName = null!;
     private OptionButton _newClass = null!;
     private Label _status = null!;
+
+    /// <summary>Character picked on this screen (Main stores it on the central
+    /// client for the progression save).</summary>
+    public CharacterDto? LastPicked { get; private set; }
     public static readonly string[] ClassIds = { "warden", "nightblade", "revenant" };
     private static readonly Color[] ClassColors = { UiTheme.ColdSteel, UiTheme.Arcane, new("#4a5a3a") };
 
@@ -144,13 +156,39 @@ public partial class CharacterSelect : Control
         name.AddThemeFontSizeOverride("font_size", 22);
         box.AddChild(name);
 
+        var level = Progression.LevelForXp(c.Xp);
         var detail = new Label
         {
-            Text = $"{c.ClassId} — level {c.Level} — xp {c.Xp} — mmr {c.Mmr}",
+            Text = $"{c.ClassId} — level {level} — xp {c.Xp} — mmr {c.Mmr}",
         };
         detail.AddThemeColorOverride("font_color", UiTheme.Bone);
         box.AddChild(detail);
+
+        // Card = the pick button (Vision 6.10 flow: select -> server browser).
+        // Clicking arms the class for the realm + fires the pick signal; the
+        // hover state uses the theme's Button stylebox.
+        var pick = new Button
+        {
+            Text = "Select",
+            CustomMinimumSize = new Vector2(0, 30),
+        };
+        pick.Pressed += () => Pick(c);
+        box.AddChild(pick);
         return panel;
+    }
+
+    /// <summary>Pick a champion: sets PendingClass for BOTH the local body and
+    /// the realm handshake (NEXT TASKS 1), stores the progression session
+    /// (central XP at pick time) and opens the server browser.</summary>
+    private void Pick(CharacterDto c)
+    {
+        PlayerController.PendingClass = PlayerClassInfo.FromId(c.ClassId);
+        CombatAuthority.PendingClass = c.ClassId;
+        ProgressionSession.Select(c.Id, c.Name, c.ClassId, c.Xp);
+        LastPicked = c;
+        GD.Print($"CHARACTER PICKED: {c.Name} ({c.ClassId}) id={c.Id} xp={c.Xp} — class armed, session started");
+        SetStatus($"{c.Name} selected — entering the server browser", UiTheme.Accent);
+        EmitSignal(SignalName.CharacterPicked, c.Name);
     }
 
     private async Task CreateCharacter()

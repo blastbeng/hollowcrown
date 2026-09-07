@@ -3,6 +3,7 @@ using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Networking;
 using Hollowcrown.Player;
+using Hollowcrown.Save;
 
 namespace Hollowcrown.UI;
 
@@ -29,6 +30,9 @@ public partial class ArenaHud : CanvasLayer
     private Label _targetName = null!;
     private PanelContainer _feedPanel = null!;
     private VBoxContainer _feed = null!;
+    private Label _levelText = null!;
+    private ProgressBar _xpBar = null!;
+    private Button _leaveButton = null!;
     private readonly List<Slot> _slots = new();
     private readonly List<(Label Label, float Age)> _feedLines = new();
 
@@ -59,10 +63,57 @@ public partial class ArenaHud : CanvasLayer
         BuildBarsAndSlots(root);
         BuildTargetFrame(root);
         BuildKillFeed(root);
+        BuildLevelRow(root);
         if (CombatAuthority.For(this) is { } auth)
             auth.KillFeed += AddKillFeed;   // server-broadcast killfeed
-        GD.Print($"ARENA HUD READY — {_slots.Count} ability slots, stamina, target frame, killfeed");
+        GD.Print($"ARENA HUD READY — {_slots.Count} ability slots, stamina, target frame, killfeed, XP row");
     }
+
+    /// <summary>Vision 6.10/8: top-left level + XP progress (from the live
+    /// server-mirrored match counters) and the LEAVE REALM button that ends
+    /// the match into the results screen.</summary>
+    private void BuildLevelRow(Control root)
+    {
+        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        panel.AddThemeStyleboxOverride("panel", SlotBox(UiTheme.Panel, UiTheme.PanelBorder));
+        panel.AnchorLeft = 0f; panel.AnchorRight = 0f;
+        panel.AnchorTop = 0f; panel.AnchorBottom = 0f;
+        panel.OffsetLeft = 12f; panel.OffsetRight = 208f;
+        panel.OffsetTop = 12f; panel.OffsetBottom = 74f;
+        root.AddChild(panel);
+
+        var box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        box.AddThemeConstantOverride("separation", 3);
+        panel.AddChild(box);
+
+        _levelText = new Label
+        {
+            Text = "LEVEL 1",
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _levelText.AddThemeFontSizeOverride("font_size", 13);
+        _levelText.AddThemeColorOverride("font_color", UiTheme.Accent);
+        box.AddChild(_levelText);
+
+        _xpBar = new ProgressBar
+        {
+            MinValue = 0, MaxValue = 1, Value = 0,
+            ShowPercentage = false,
+            CustomMinimumSize = new Vector2(180, 8),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _xpBar.AddThemeStyleboxOverride("background", SlotBox(new Color("#0d0c10"), UiTheme.PanelBorder));
+        _xpBar.AddThemeStyleboxOverride("fill", SlotBox(UiTheme.Arcane, UiTheme.Arcane));
+        box.AddChild(_xpBar);
+
+        _leaveButton = new Button { Text = "Leave Realm" };
+        _leaveButton.Pressed += () => EmitSignal(SignalName.LeaveRealm);
+        box.AddChild(_leaveButton);
+    }
+
+    /// <summary>Fired by the Leave Realm button — Main shows the results
+    /// screen and saves progression to central (Vision 6.10 flow).</summary>
+    [Signal] public delegate void LeaveRealmEventHandler();
 
     // ------------------------------ Ability bar ---------------------------
 
@@ -297,6 +348,15 @@ public partial class ArenaHud : CanvasLayer
         _hpText.Text = $"{_pc.Hp}/{_pc.MaxHp}";
         _staminaBar.Value = _pc.Stamina;
         _staminaText.Text = $"{_pc.Stamina:0}";
+
+        // Level + XP row (Vision 8): live from the authority-mirrored match
+        // counters on top of the character's central XP.
+        long totalXp = ProgressionSession.TotalXp;
+        int level = Progression.LevelForXp(totalXp);
+        _levelText.Text = level >= Progression.MaxLevel
+            ? $"LEVEL {level} (MAX) — {_pc.MatchKills} kills"
+            : $"LEVEL {level} — {_pc.MatchKills} kills";
+        _xpBar.Value = Progression.LevelProgress(totalXp);
 
         // Cooldown sweeps + active glow.
         foreach (var slot in _slots)

@@ -43,6 +43,7 @@ public partial class CombatBot : CharacterBody3D, ICombatTarget
     public void OnRooted(float seconds) { }
     public void OnWard(float amount) { }
     public void OnHealed(int hpAfter) => Hp = Mathf.Clamp(hpAfter, 0, MaxHp);
+    public void OnProgress(int kills, int xp) { }
 
     public void OnHitApplied(int amount, bool heavy, int hpAfter)
     {
