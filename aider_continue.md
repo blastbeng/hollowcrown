@@ -176,36 +176,89 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
-   Vision 4 wants match-server tokens for /servers/heartbeat + PUT progress
-   — land them here).
+1. Remote-avatar combat polish (fold of old 7 + 13 leftovers): attack-cast
+   relay (puppets can't show remote swings/casts), root/stealth visuals on
+   remote puppets (RemoteAvatar.OnRooted is a no-op stub), nameplate HP bars
+   over remote avatars, REMOTE-PEER GEAR GAP (vitality/ward/haste derive from
+   the LOCAL session only — fix = handshake gear report signed by the match
+   server or central-sourced gear at spawn approval).
 2. Skirmish mode (3v3) + team spawns/score.
 3. Open world zone: village chunks, shrines, roaming elites, minimap.
 4. Matchmaking quick-play flow via central.
 5. Atmosphere pass 2: ambience audio, fog drift, fireflies.
 6. Windows + Linux export presets + dedicated server headless export.
-7. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
-    session 9 also saw a client ENet peer go INACTIVE while Networked==true,
-    spewing "multiplayer instance isn't currently active" each frame: detect
-    and recover), position-report trust checks (anti-cheat: shadow step is
-    client-simulated movement, position reports unvalidated), nameplate HP
-    bars over REMOTE avatars, attack-cast relay (puppets can't show remote
-    swings/casts yet — only locomotion/hit/death), root/stealth visuals on
-    remote puppets (root is server-applied but only the LOCAL body locks;
-    RemoteAvatar.OnRooted is a no-op stub), REMOTE-PEER GEAR GAP (vitality/
-    ward/haste derive from the LOCAL session only — a dedicated server sees
-    plain 100 hp / no haste for remote peers; fix = handshake gear report
-    signed by the match server or central-sourced gear at spawn approval).
-8. Harness v2 (optional): full 3x3 class matrix in one run (3 bots, last-
-    standing scoring), per-matchup 45-55% tuning with kits (dodge/block use
-    needs a smarter bot brain than chain-spam), CI hook in tools/test.sh.
+7. Robustness: rejoin UX (kicked/lost peers resume offline silently),
+   position-report trust checks (anti-cheat: shadow step client-simulated),
+   central rate limiting (v1 has none), BLENDER-MCP FIRST MESH PASS (the
+   plugin is now live on the host — obelisk/braziers/arches as real .glb
+   hero pieces per Vision 6.6).
+8. Harness v2 (optional): full 3x3 class matrix in one run (3 bots,
+   last-standing scoring), per-matchup 45-55% tuning with kits, CI hook in
+   tools/test.sh.
 9. Arena polish leftovers (small): second banner palette on the far ring
-    side, cobwebs under the arch lintels (currently high corners only),
-    Prop_Crate/MetalFence kit pieces placed as spawn-side dressing (already
-    committed in the lean subset, unused on screen yet); results-screen
-    common-row tint reads violet under the dim overlay (should be bone/steel
-    — verify the row color logic); offline target frame kept a stale hp
-    mirror through the A/B haste test.
+   side, cobwebs under the arch lintels, Prop_Crate/MetalFence kit pieces
+   placed as spawn-side dressing.
+
+SESSION 16 NOTE (2026-09-07) — MMR/ELO + LEADERBOARD + TIERS + MATCH-SERVER
+TOKENS DONE, all verified end-to-end (Vision 8/4; was NEXT TASKS 1).
+RATING: shared/Rating.cs = full Elo (start 1000, K=32, logistic expected,
+floor 100) + tier ladder Ash 0-899 / Iron 900-1099 / Bronze / Silver / Gold /
+Obsidian / Crown 1900+ (numbers in BALANCE.md; shared by central + game).
+CENTRAL (0.3.0): POST /servers/register mints a match-server token
+(servers.token migration; re-register refreshes the row+token);
+/servers/heartbeat requires the token as BEARER (anonymous = 403);
+PUT /characters/{id}/progress requires the USER bearer (ownership) + the
+realm token in X-Server-Token (relay path; a pure server-bearer shortcut was
+CLOSED as a design hole — no user identity = any token holder could write
+any character); POST /mmr/report requires the server token as BEARER (body-
+only token = 403, found live), ratings READ FROM THE DB (client numbers
+never trusted), zero-sum per-char updates (a single UPDATE ... IN once
+stamped the WINNER's rating on both rows — fixed); GET /leaderboard = top
+50 + tier names. GAME: DedicatedServer registers + heartbeats with its
+token (Heartbeat sends the bearer — 403 found live before the fix); realm
+handshake carries the central characterId (HC_CHARACTER env mirrors
+--character for playtester runs); the approved peer RECEIVES the realm
+token via ServerTokenRpc broadcast (clients can relay saves without
+inventing it); PvP kill -> server reports Elo -> MmrRpc broadcast; session
+MMR mirror; results screen MMR row (delta + tier) + leaderboard top 5;
+character select cards show "mmr N — TIER" + a leaderboard dialog.
+EVIDENCE (dedicated server 7777 + playtester client + headless loser
+client, both with central character ids): login -> pick ProbeWin2 (id 11)
+-> browser -> realm join -> loser client joins (id 12, nightblade, token
+received 9BD8C201…) -> parked + server-validated chain (20/35/35/35, 4th
+finisher 100->0) -> KILL -> "AUTHORITY: XP +50 (kills=1)" (PvP XP — the
+old victimId>=1000 dummy heuristic misread real ENet peer ids and awarded
+dummy XP + skipped MMR; now peer-registration-based) -> "AUTHORITY: MMR
++13 winner_char=11 -> 1044 (Iron) | -13 loser_char=12 -> 956" -> central
+leaderboard row ProbeWin2 1044 Iron -> Leave Realm -> results (KILLS 1,
++50 XP, MMR 1044 (+13) — Iron, LEADERBOARD top 5, "progress saved — level
+1, xp 50, mmr 1044 (+13 Iron)") -> central DB re-read (11: xp 50, mmr
+1044; 12: mmr 956) -> character card re-read shows mmr 1044 — Iron.
+Character select screenshot shows tier labels; leaderboard dialog lists
+ranks with tiers. test.sh covers: register->token, heartbeat 403 without
+token, PUT 403 without X-Server-Token, PUT 401 on server-bearer, Elo
+zero-sum +16/-16, same-char 400, bad-token 403, leaderboard tier names.
+COMMITS f1ad61d (feature) + a477468/0f208fd/5f398dd/6310ba9/4654ab0
+(fixes found live) + 0db6a31 (Blender MCP docs) + this docs commit.
+GOTCHAS (session 16): (58) The host's ufw silently DROPPED 6550/6560 from
+the LAN after a router/distro change — "bridge not connected" with the
+port LISTENING on the host = check ufw FIRST (sudo ufw allow
+proto tcp from 192.168.1.0/24 to any port 6550/6560 fixed it).
+(59) nohup-inside-ssh background processes DIE when the ssh session ends
+if stdout/stderr are the only redirects — use setsid + </dev/null +
+disown; verify with ps across SEPARATE ssh calls.
+(60) The DS kills itself silently when two nohup relaunches race in one
+command — launch, verify, relaunch in separate calls (gotcha 46 redux).
+(61) Body-only serverToken on /mmr/report is a 403 — the token must be
+the Authorization BEARER (central resolves bearer-only by design).
+(62) Progress PUT needs USER bearer + X-Server-Token; server-bearer-only
+was an ownership hole and is rejected (401).
+(63) Old-session servers rows with empty tokens accumulate in the
+servers table and purge-expire only on TTL — clean stale rows before
+testing the browser (python sqlite3, no sqlite3 CLI on the remote).
+(64) exec GDScript: no ternary "? :" (use a if cond else b);
+find_children returns non-Node3D too — guard by get_class().
+NEXT: remote-avatar combat polish (NEXT TASKS 1).
 
 SESSION 15 NOTE (2026-09-07) — LOOT SLICE 3 DONE, all verified end-to-end
 (Vision 8; was NEXT TASKS 1). WEAPON SLOT: ItemGenerator.EquipSlot grew
