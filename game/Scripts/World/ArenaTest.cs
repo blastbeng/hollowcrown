@@ -209,10 +209,12 @@ public partial class ArenaTest : Node3D
         {
             var arch = new StaticBody3D { Name = "Arch" };
             arch.AddToGroup("occluder");
-            arch.AddChild(new MeshInstance3D
-            {
-                Mesh = GD.Load<Mesh>("res://assets/models/medieval_kit/Wall_Arch.gltf"),
-            });
+            // .gltf imports as a PackedScene (meshes + kit materials inside) —
+            // loading it as Mesh throws in Godot 4.7 and killed the arena
+            // build once already. Instantiate the scene node instead.
+            var archScene = GD.Load<PackedScene>("res://assets/models/medieval_kit/Wall_Arch.gltf");
+            if (archScene?.Instantiate() is Node archModel)
+                arch.AddChild(archModel);
             // Panel collision: legs + lintel approximated by one 2 x 3 frame
             // box minus the door gap — two leg boxes keep the opening walkable.
             arch.AddChild(new CollisionShape3D
