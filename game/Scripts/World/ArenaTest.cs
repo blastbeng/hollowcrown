@@ -21,13 +21,15 @@ public partial class ArenaTest : Node3D
         BuildWall();
         BuildRingWall();
         BuildObelisk();
+        BuildArches();
         BuildBrazier(-3.5f, 2.2f, -3.5f);   // spawn side
         BuildBrazier(3.5f, 2.2f, 3.5f);     // obelisk side
         BuildRubble();
+        BuildBannersAndDetails();
         BuildDummy();
         BuildPlayer();
         BuildCameraAndHelpers();
-        GD.Print("ARENA TEST READY — iso camera rig, cursor aim reticle, occlusion fade, combat live");
+        GD.Print("ARENA TEST READY — iso camera rig, cursor aim reticle, occlusion fade, combat live, gothic arches + banners");
     }
 
     private void BuildEnvironment()
@@ -186,6 +188,90 @@ public partial class ArenaTest : Node3D
             Multimesh = multi,
             MaterialOverride = MaterialFactory.RubbleStone(),
         });
+    }
+
+    /// <summary>Gothic arches (Vision 6.6): Quaternius Medieval Village
+    /// MegaKit Wall_Arch panels (CC0, ATTRIBUTION.md) flanking the arena's
+    /// west/east sides — ogival stone openings that frame the fight, plus a
+    /// broken half-arch pair by the breach. Collision matches the panel.
+    /// Blender MCP unavailable — store kit pieces were used instead.</summary>
+    private void BuildArches()
+    {
+        // Panel = 2 m wide x 3 m tall x 0.06 m thick (kit bbox measured).
+        (float x, float z, float yaw, bool broken)[] placements =
+        {
+            (-9.5f, -4f, 90f, false),   // west pair, opening faces the ring
+            (-9.5f, 4f, 90f, false),
+            (9.5f, -4f, 90f, false),    // east pair
+            (9.5f, 4f, 90f, true),      // one broken piece
+        };
+        foreach (var (x, z, yawDeg, broken) in placements)
+        {
+            var arch = new StaticBody3D { Name = "Arch" };
+            arch.AddToGroup("occluder");
+            arch.AddChild(new MeshInstance3D
+            {
+                Mesh = GD.Load<Mesh>("res://assets/models/medieval_kit/Wall_Arch.gltf"),
+            });
+            // Panel collision: legs + lintel approximated by one 2 x 3 frame
+            // box minus the door gap — two leg boxes keep the opening walkable.
+            arch.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(0.5f, 3f, 0.2f) },
+                Position = new Vector3(-0.75f, 1.5f, 0),
+            });
+            arch.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(0.5f, 3f, 0.2f) },
+                Position = new Vector3(0.75f, 1.5f, 0),
+            });
+            arch.AddChild(new CollisionShape3D
+            {
+                Shape = new BoxShape3D { Size = new Vector3(2f, 0.8f, 0.2f) },
+                Position = new Vector3(0, 2.6f, 0),
+            });
+            arch.Position = new Vector3(x, 0, z);
+            arch.RotationDegrees = new Vector3(0, yawDeg, 0);
+            if (broken)
+            {
+                arch.RotationDegrees = new Vector3(0, yawDeg + 8f, 4f);  // sunk/tipped
+                arch.Position = new Vector3(x, -0.15f, z);
+            }
+            AddChild(arch);
+        }
+    }
+
+    /// <summary>Vision 6.7 world sellers: war banners on poles by the breach,
+    /// hanging chains under the arch lintels, cobwebs in the corners of the
+    /// west arches (all Banner.cs, palette materials).</summary>
+    private void BuildBannersAndDetails()
+    {
+        // Banners flank the breach on the ring wall (blood-red + warden steel).
+        var banner1 = Banner.WarBanner(Color.FromHtml("7a1414"));   // blood
+        banner1.Position = new Vector3(-1.5f, 0, 12.4f);
+        banner1.RotationDegrees = new Vector3(0, 180f, 0);
+        AddChild(banner1);
+        var banner2 = Banner.WarBanner(Color.FromHtml("4a4f5a"));   // cold steel
+        banner2.Position = new Vector3(1.5f, 0, 12.4f);
+        banner2.RotationDegrees = new Vector3(0, 180f, 0);
+        AddChild(banner2);
+
+        // Chains under the intact arch lintels (dropping from y=2.9).
+        foreach (var (x, z) in new[] { (-9.5f, -4f), (-9.5f, 4f), (9.5f, -4f) })
+        {
+            var chain = Banner.Chain(1.1f);
+            chain.Position = new Vector3(x + 0.7f, 2.9f, z + 0.55f);
+            AddChild(chain);
+        }
+
+        // Cobwebs in the arch corners — face the camera diagonal.
+        foreach (var (x, z) in new[] { (-9.5f, -4f), (-9.5f, 4f), (9.5f, 4f) })
+        {
+            var web = Banner.Cobweb(1.1f);
+            web.Position = new Vector3(x - 0.6f, 2.55f, z - 0.75f);
+            web.RotationDegrees = new Vector3(90f, -45f, 0f);
+            AddChild(web);
+        }
     }
 
     private void BuildFloor()

@@ -10,3 +10,9 @@ One line per installed asset: name, author, license, source, installed in.
   (upstream models/animations: Quaternius, CC0 — quaternius.com).
   Installed in: game/addons/quaternius_ik_rigged/, game/Godot - UE/ (textures),
   game/Scripts/Player/WardenModel.cs — Warden class model, iter of 2026-09-04.
+- Quaternius Medieval Village MegaKit (lean subset: Wall_Arch, Wall_Plaster_Straight,
+  Prop_MetalFence_Ornament, Prop_Crate + T_WoodTrim/T_Plaster/T_MetalOrnaments
+  textures) — Quaternius, CC0 1.0,
+  https://store.godotengine.org/asset/quaternius/medieval-village-megakit
+  (upstream: quaternius.com, CC0). Installed in: game/assets/models/medieval_kit/
+  — duel-arena gothic arches + ruin dressing, iter of 2026-09-07.

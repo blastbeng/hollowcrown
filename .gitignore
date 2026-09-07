@@ -5,6 +5,9 @@ obj/
 *.user
 *.tmp
 
+# Store download scratch (zips are re-fetchable; the lean copies are committed)
+/tmp/
+
 # Runtime data (central server SQLite database)
 *.db
 *.db-shm
