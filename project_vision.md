@@ -126,12 +126,17 @@ local godot /opt/godot/bin/godot).
   ATTRIBUTION.md: name, author, license, URL. Retint assets toward the
   palette so art direction stays consistent. Commit asset files + .import
   metadata.
-- Blender MCP: probe availability at session start (one cheap call).
-  WHEN AVAILABLE you MUST use it for custom meshes the store lacks: statues,
-  braziers, gates, broken walls, weapons, class armor pieces. Export .glb to
-  `game/assets/models/`, commit, note "blender-mcp" in the commit message.
-  WHEN UNAVAILABLE: fall back to store assets or primitives and say so in
-  the commit message.
+- Blender MCP: runs ON THE REMOTE HOST (192.168.1.29) as a systemd service —
+  `sudo systemctl start blender-mcp` (autostarts whenever the host is online);
+  probe availability at session start (one cheap call). It is reachable ONLY
+  while that host is up: when the host is offline there is NO fallback
+  Blender MCP anywhere. WHEN AVAILABLE you MUST use it for custom meshes the
+  store lacks or for store assets that need Blender work (merge/retarget/
+  retint/repair, kit piece variants): statues, braziers, gates, broken walls,
+  weapons, class armor pieces. Export .glb to `game/assets/models/`, commit,
+  note "blender-mcp" in the commit message. WHEN UNAVAILABLE (host offline or
+  service down): fall back to store assets or primitives and say so in the
+  commit message.
 - Web search: verify Godot 4 API names/signatures for anything uncommon
   (versions drift — never trust memory for exact enum/API names).
 - GitHub search: reference implementations (headless dedicated servers, Elo,

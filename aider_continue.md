@@ -136,8 +136,15 @@ compile check (remote or local):
   godot-store-mcp---library_download_asset (downloads zip locally).
   New store: search godot-store-mcp---store_search, details
   godot-store-mcp---store_get_asset, download godot-store-mcp---store_download_asset.
-- blender: NOT configured (no blender MCP in mcp-servers.json) -> fallback to
-  store assets / primitives per project_vision.md Section 5, note it in commits.
+- blender: NEW MCP PLUGIN — runs ON THE REMOTE HOST as a systemd service:
+  `sudo systemctl start blender-mcp` on 192.168.1.29 (autostarts whenever the
+  host is online; there is NO fallback Blender MCP when the host is offline).
+  Probe availability at session start (one cheap call). Use it for custom
+  meshes the store lacks AND for store assets that need Blender work
+  (merge/retarget/retint/repair kit pieces): statues, braziers, gates, broken
+  walls, weapons, class armor pieces. Export .glb to game/assets/models/,
+  commit, note "blender-mcp" in the commit message. Host offline or service
+  down -> fallback to store assets / primitives, note it in commits.
 - web search: gateway---searxng_web_search | page read: gateway---web_url_read,
   power---fetch | playwright: playwright---browser_navigate, browser_snapshot,
   browser_take_screenshot | github search: gateway---search_code,
