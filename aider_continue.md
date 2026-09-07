@@ -169,9 +169,9 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Loot slice 2: inventory/equip UI + affix effects on stats + equipment
-   changes the character's tint/attached meshes (Vision 8); serialize session
-   loot into the central gear_json on save (column exists, still '[]').
+1. Loot slice 3 (small): weapon-slot drops (Blade/Dagger/Staff currently map
+   to Body in BaseSlots — give them a Weapon slot + attach the mesh),
+   affix haste consumer (banked in BALANCE.md, no effect yet), unequip UX.
 2. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
    Vision 4 wants match-server tokens for /servers/heartbeat + PUT progress
    — land them here).
@@ -196,6 +196,61 @@ compile check (remote or local):
     side, cobwebs under the arch lintels (currently high corners only),
     Prop_Crate/MetalFence kit pieces placed as spawn-side dressing (already
     committed in the lean subset, unused on screen yet).
+
+SESSION 14 NOTE (2026-09-07) — LOOT SLICE 2 DONE, all verified end-to-end
+(Vision 8; was NEXT TASKS 1). INVENTORY/EQUIP UI: InventoryPanel.cs (Canvas
+Layer 8, Tab = inventory_toggle action or the HUD "Inventory (Tab)" button)
+— bag column (rarity swatch + name + rarity label + ilvl + affix lines +
+Equip buttons, scrollable) + equipped column (Body slot + derived stat
+readout "max hp / dmg x / ward"). EQUIPPED-AFFIX STATS (server-mirrored):
+ProgressionSession.StatTotal/DerivedMaxHp (100 + vitality),
+DerivedDamageMult (1 + 0.01*power), DerivedWard (ward pool); the server
+derives the SAME numbers via CombatAuthority.MaxHpOf (handshake max_hp) and
+ApplyWard/ward-expiry (gear pool replaces the kit pool and RESTORES after
+the kit ward expires, _wards dictionary shared). BALANCE.md loot-affix
+table added (rarity weights, affix pool/count, drop ilvl, per-stat values,
+haste banked). EQUIPMENT VISUALS: WardenModel.ApplyEquipmentTint — rare+
+gear lerps the body shader tint 40% toward the rarity color (common gear
+keeps the class tint); PlayerController applies at spawn (restored gear)
+and on EquipmentChanged broadcasts (CombatAuthority.RequestEquip ->
+EquipRpc rebroadcast, AnyPeer). GEAR_JSON ROUND-TRIP: Main now PUTs
+ProgressionSession.SerializeGear() (ItemGenerator.BagToJson — the full bag
+with slot + affixes) instead of the stale central copy; Pick() hands
+character.GearJson to ProgressionSession.Select, which rebuilds the bag
+via ItemGenerator.ParseBag (tolerates legacy/objects, skips malformed) and
+re-equips any affixed item into its slot. ResultsScreen LOOT GAINED now
+lists full items with affixes, rarity-colored when rare+; save status says
+"N item(s) in gear".
+EVIDENCE (dedicated server 7777 + playtester client over ENet): kill ->
+drop (Hollow Pauldrons common +2 vitality) -> walk-over pickup ->
+LootGranted toast "+ Hollow Pauldrons (common)" -> inventory: item row
+with affix, Equip -> Body slot shows the item and max hp 100 -> 102;
+second kill/drop (Vowkeeper's Gauntlets of Cinders uncommon +1 power) ->
+equip -> dmg x1.00 -> x1.01 on the panel; Leave Realm -> results (KILLS 2,
+XP +50, loot rows with affixes, "progress saved — level 1, xp 50, 2
+item(s) in gear") -> central DB re-read: gear_json = full 2-item JSON
+array; RE-PICK the card -> JoinRealm -> bag RESTORED (bag=2, dmg x1.01
+live before any pickup) -> third kill -> pickup (Hollow Crown +2 vitality)
+-> results "3 item(s) in gear" -> central DB: level 1, xp 75, 3-item
+gear_json. Zero script errors; screenshots judged vs Section 6 (inventory
+panel palette-correct, results rows readable, loot toast in-world, HUD
+live, iso dusk arena with rain + braziers + banners).
+COMMITS 1bb5528 (loot slice 2) + this docs commit.
+GOTCHAS (session 14): (47) The old-library registry on the remote serves
+STALE server entries — after remote_test.sh restarts, the playtester's
+first browser Join hit a dead host (networked=true, peer_count=0, every
+hit silently RPC'd into the void: target dead / no reply, HP never
+moved). Always start a FRESH dedicated server over SSH and JoinRealm
+(h:p) directly when driving kills via MCP. (48) exec GDScript on this
+build: PascalCase only for C# METHODS (Swing, _mcp_state works as a
+callable), snake_case for native (get_node, set("text"), emit_signal);
+find_children + property get()/set() is the safe pattern for C#-built UI.
+(49) InputEventKey physical_keycode 4194306 = KEY_TAB (project.godot
+input action for inventory_toggle). (50) ProgressionSession.Select now
+takes gearJson — CharacterSelect.Pick passes character.GearJson; a call
+with the old 4-arg signature is a compile error (intended, keeps the
+callers honest). NEXT: loot slice 3 (weapon slots + haste consumer +
+unequip), then MMR/Elo.
 
 SESSION 13 NOTE (2026-09-07) — XP/LEVELING + PROGRESSION SYNC + RESULTS +
 LOOT SLICE 1 DONE, all verified end-to-end (Vision 6.10/8; was NEXT TASKS 1).
