@@ -112,11 +112,20 @@ public partial class CentralClient : Node
     {
         try
         {
-            // Vision 4: the PUT now requires the MATCH-SERVER token — the
-            // client relays the server token it received at realm handshake.
-            using var resp = await Authed(HttpMethod.Put, $"characters/{characterId}/progress",
-                new ProgressRequest(level, xp, gearJson),
-                bearer: CombatAuthority.ServerToken);
+            // Vision 4: the PUT requires BOTH identities — the USER token as the
+            // bearer (ownership) and the realm's match-server token (received at
+            // spawn approval) as X-Server-Token. The client never invents it.
+            using var req = new HttpRequestMessage(HttpMethod.Put, $"{EffectiveBaseUrl}/characters/{characterId}/progress")
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(new ProgressRequest(level, xp, gearJson), JsonOpts),
+                    System.Text.Encoding.UTF8, "application/json"),
+            };
+            if (Token.Length > 0)
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+            if (CombatAuthority.ServerToken.Length > 0)
+                req.Headers.Add("X-Server-Token", CombatAuthority.ServerToken);
+            using var resp = await Http.SendAsync(req);
             return resp.IsSuccessStatusCode
                 ? await resp.Content.ReadFromJsonAsync<CharacterDto>(JsonOpts)
                 : null;

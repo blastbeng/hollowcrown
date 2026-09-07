@@ -47,8 +47,10 @@ STOKEN=$(curl -sf -X POST http://127.0.0.1:6561/servers/register -H 'Content-Typ
 SAUTH="Authorization: Bearer $STOKEN"
 CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT http://127.0.0.1:6561/characters/$CID/progress -H "$AUTH" -H 'Content-Type: application/json' -d '{"level":3,"xp":420,"gearJson":"[]"}')
 [ "$CODE" = "403" ] || fail "progress save WITHOUT server token must be 403 (got $CODE)" 2
-curl -sf -X PUT http://127.0.0.1:6561/characters/$CID/progress -H "$SAUTH" -H 'Content-Type: application/json' -d '{"level":3,"xp":420,"gearJson":"[]"}' | grep -q '"level":3' || fail "progress save (server token)" 2
+curl -sf -X PUT http://127.0.0.1:6561/characters/$CID/progress -H "$AUTH" -H "X-Server-Token: $STOKEN" -H 'Content-Type: application/json' -d '{"level":3,"xp":420,"gearJson":"[]"}' | grep -q '"level":3' || fail "progress save (user + X-Server-Token relay)" 2
 curl -sf http://127.0.0.1:6561/characters/$CID -H "$AUTH" | grep -q '"xp":420' || fail "progress reload" 2
+CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT http://127.0.0.1:6561/characters/$CID/progress -H "$SAUTH" -H 'Content-Type: application/json' -d '{"level":3,"xp":420,"gearJson":"[]"}')
+[ "$CODE" = "401" ] || fail "server-token bearer PUT must be 401 (user identity required) (got $CODE)" 2
 # Elo (Vision 8): server-token report, zero-sum, DB-owned ratings.
 CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:6561/mmr/report -H "$SAUTH" -H 'Content-Type: application/json' \
   -d "{\"serverToken\":\"$STOKEN\",\"modeId\":0,\"winnerCharacterId\":$CID,\"loserCharacterId\":$CID}")

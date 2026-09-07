@@ -300,6 +300,10 @@ public partial class CombatAuthority : Node
         _respawnPos[peer] = spawn;
         info.Position = spawn;
         SendSpawnPlayer(peer, spawn, name, info.ClassId);
+        // Vision 4: hand the approved peer the realm's match-server token —
+        // the client relays it (X-Server-Token) on progression saves. Never
+        // sent to unapproved peers.
+        RpcId(peer, nameof(ServerTokenRpc), ServerToken);
         GD.Print($"REALM: peer {peer} approved ({info.ClassId}) — spawns at {spawn}");
 
         // Catch the new peer up with everyone already approved in the realm
@@ -329,6 +333,18 @@ public partial class CombatAuthority : Node
             Rpc(nameof(DespawnPlayerRpc), peerId);
         else
             DespawnPlayerRpc(peerId);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void ServerTokenRpc(string token)
+    {
+        // Vision 4: the match server hands its token to approved peers so the
+        // client can RELAY progression saves (user token = player, X-Server-Token
+        // = realm). The client never invents it; a realm that never registered
+        // sends an empty string and saves fail closed.
+        ServerToken = token;
+        GD.Print($"REALM: match-server token received ({(token.Length == 0 ? "none" : token[..8] + "…")})");
     }
 
     [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,

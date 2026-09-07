@@ -180,24 +180,19 @@ app.MapGet("/characters/{id}", (HttpRequest req, int id) =>
 app.MapPut("/characters/{id}/progress", (HttpRequest req, int id, ProgressRequest r) =>
 {
     using var conn = Db.Open();
-    // Vision 4: progression is MATCH-SERVER-owned data. Two honest shapes:
-    //  a) the match server itself: Authorization: Bearer <server token>
-    //     (user identity = the token's registered realm);
-    //  b) the authenticated client relaying the save: Authorization carries
-    //     the USER token + X-Server-Token carries the match server's token
-    //     (the client received it from the realm handshake — it never invents it).
-    var serverBearer = ResolveServer(req, conn);
-    var user = serverBearer is not null ? null : ResolveUser(req, conn);
-    if (serverBearer is null && user is null) return Fail(401, "unauthorized");
+    // Vision 4: progression is MATCH-SERVER-owned data. The authenticated
+    // client relays the save: the USER token identifies the player (ownership
+    // is checked) and X-Server-Token carries the realm's match-server token —
+    // broadcast to every approved peer at spawn approval, never self-invented.
+    // (A pure server-token bearer was REJECTED as a design hole: it had no
+    // user identity, so any token holder could rewrite ANY character.)
+    var user = ResolveUser(req, conn);
+    if (user is null) return Fail(401, "unauthorized");
+    if (!OwnsCharacter(conn, user.Value.UserId, id)) return Fail(404, "character not found");
     var headerToken = req.Headers["X-Server-Token"].ToString();
-    var serverOk = serverBearer is not null || (headerToken.Length > 0 &&
-        Convert.ToInt64(conn.Scalar("SELECT COUNT(*) FROM servers WHERE token = $t", ("$t", headerToken))) > 0);
-    if (!serverOk)
+    if (headerToken.Length == 0 ||
+        Convert.ToInt64(conn.Scalar("SELECT COUNT(*) FROM servers WHERE token = $t", ("$t", headerToken))) == 0)
         return Fail(403, "match server token required for progression saves");
-    // The relay path saves on behalf of the OWNED character; the dedicated
-    // server saves any character it hosts (the realm is the saver).
-    if (user is not null && !OwnsCharacter(conn, user.Value.UserId, id))
-        return Fail(404, "character not found");
 
     // validate reports against sane caps (vision Section 4 anti-cheat stance)
     var level = Math.Clamp(r.Level, 1, MaxLevel);
