@@ -169,30 +169,22 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Balance harness v1 (NEXT TASKS 3 pulled up): it UNBLOCKS the last two
-   revenant verifications — ward ABSORPTION (a hit on a warded body) and the
-   uncapped LEECH (a damaged caster) are unreachable offline (self-hit
-   guard) and need a bot attacker. Bot = headless client that joins,
-   moves toward the nearest target and chain-attacks on a timer (no MCP
-   dependency, launch flag --bot). Then print the winrate matrix per
-   BALANCE.md. ALSO add HC_JOIN env support in Main (mirror of HC_CLASS)
-   so the playtester client can join realms for driven PvP tests.
-2. Arena polish remainder: gothic arches (store assets or Blender), banner
+1. Arena polish remainder: gothic arches (store assets or Blender), banner
    sway, chains/cobwebs (6.7), ember mote tuning (currently reads as glow —
    want distinct rising sparks). (Rubble ~2x DONE, verified on screen.)
-3. XP/leveling + progression sync to central + results screen; while there:
+2. XP/leveling + progression sync to central + results screen; while there:
    character-select card click should set PlayerController.PendingClass +
    CombatAuthority.PendingClass (classes are boot-flag only right now).
-4. Loot: procedural items/affixes + inventory/equip UI + visual tint.
-5. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
+3. Loot: procedural items/affixes + inventory/equip UI + visual tint.
+4. MMR/Elo reporting + leaderboard UI + tiers (central endpoints still open;
    Vision 4 wants match-server tokens for /servers/heartbeat + PUT progress
    — land them here).
-6. Skirmish mode (3v3) + team spawns/score.
-7. Open world zone: village chunks, shrines, roaming elites, minimap.
-8. Matchmaking quick-play flow via central.
-9. Atmosphere pass 2: ambience audio, fog drift, fireflies.
-10. Windows + Linux export presets + dedicated server headless export.
-11. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
+5. Skirmish mode (3v3) + team spawns/score.
+6. Open world zone: village chunks, shrines, roaming elites, minimap.
+7. Matchmaking quick-play flow via central.
+8. Atmosphere pass 2: ambience audio, fog drift, fireflies.
+9. Windows + Linux export presets + dedicated server headless export.
+10. Robustness: rejoin UX (kicked/lost peers currently just resume offline —
     session 9 also saw a client ENet peer go INACTIVE while Networked==true,
     spewing "multiplayer instance isn't currently active" each frame: detect
     and recover), position-report trust checks (anti-cheat: shadow step is
@@ -201,6 +193,56 @@ compile check (remote or local):
     swings/casts yet — only locomotion/hit/death), root/stealth visuals on
     remote puppets (root is server-applied but only the LOCAL body locks;
     RemoteAvatar.OnRooted is a no-op stub).
+11. Harness v2 (optional): full 3x3 class matrix in one run (3 bots, last-
+    standing scoring), per-matchup 45-55% tuning with kits (dodge/block use
+    needs a smarter bot brain than chain-spam), CI hook in tools/test.sh.
+
+SESSION 11 NOTE (2026-09-07) — BALANCE HARNESS v1 DONE and verified end-to-end
+(Vision 7, was NEXT TASKS 1). CombatBot.cs: headless CharacterBody3D bot
+(full ICombatTarget, no model — harness runs are judged from authority logs,
+playtester visuals unchanged), joins realms via the normal handshake or
+spawns offline, walks to the nearest combat target (bots first — dummy-
+pollution excluded — else the player body), chain-attacks through
+CombatTables cadence per class (warden 1.0 s / nightblade 0.6 s / revenant
+spear 5.0 s). Main.BootBotHarness: --bot [--bot-classes a+b] [--join h:p]
+[--quit-after N] + HC_BOT/HC_JOIN env mirrors; OFFLINE runs use a BARE
+combat floor — reusing ArenaTest pulled the rigged models whose missing-
+animation error spam (~40 MB in 3 min) starved the quit timer (first run
+wedged until timeout). tools/balance_harness.sh: build + wall-clock timeout
++ KILL-line parse + matrix table. CombatAuthority: RegisterBot +
+RequestHitAs(attackerId, ...) EXPLICIT-id path (offline bots are not peer 1)
+with a sender guard (ENet senders must match; bot ids 500-999 exempt —
+world targets start at 1000), killfeed names from the roster, AUTHORITY: KILL
+evidence line; joining bots re-register under their ENet peer id at spawn
+approval. EVIDENCE: offline 25 s matrix warden vs nightblade = 2:2 kills
+(balanced raw chain trade, BALANCE.md table); playtester SpawnTestBot
+session proved BOTH previously-unreachable branches: ward ABSORPTION (bot
+strikes 20+35 dmg fully eaten, HP untouched both times, residual pool
+expired unspent) and UNCAPPED LEECH (drain on dummy 100->68 exact, caster
+25->41 = +16 = 50% of 32 with no cap at partial HP) + full bot kill loop
+(DOWN -> 3 s respawn -> re-engage). Screenshot judged vs Section 6: iso
+dusk arena + ember pools + live HUD (revenant slots, R cooldown sweep, HP
+41/100, WARDENBOT target frame) — gate passed. HC_JOIN now crosses the SSH
+hop (remote_test.sh export loop; fixes the set -u unbound-var crash the
+first edit introduced). Commits 63df0a5 + ef09529. GOTCHAS (session 11):
+(32) godot mono headless NEEDS DOTNET_ROOT/PATH exported or it segfaults
+hostfxr — tools/balance_harness.sh exports them explicitly.
+(33) ArenaTest (rigged models) is TOXIC headless without the animation
+library: 40 MB of errors in 3 min starves Timer callbacks — harness worlds
+stay bare.
+(34) pkill -f self-match: it also matches the CALLER's own command string
+(gotcha 17 redux) — bracket a letter ([g]odot) or run the kill in its own
+ssh/bash call.
+(35) remote_test.sh runs under set -u: never reference optional env without
+a ${VAR:-} default (HC_CLASS unbound crashed the launch path).
+(36) exec GDScript: SceneTree props are snake_case (current_scene); C#-
+declared props stay PascalCase (bot.CombatId, player.Class); String() has
+no Node constructor — use str(node.name).
+(37) Editor env vars (HC_CLASS etc.) only reach the game via the
+remote_test.sh export loop at LAUNCH time — editing them later does nothing
+for an already-running editor.
+NEXT: arena polish (NEXT TASKS 1) — gothic arches + banner sway + chains/
+cobwebs + ember spark tuning.
 
 SESSION 10 NOTE (2026-09-04) — NIGHTBLADE + REVENANT SLICE 1 DONE, all
 verified end-to-end (Vision 7 + 6.8). BOTH classes playable end-to-end with
