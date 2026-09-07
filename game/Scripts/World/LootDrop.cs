@@ -13,7 +13,7 @@ namespace Hollowcrown.World;
 public partial class LootDrop : Node3D
 {
     public const float PickupRadius = 1.6f;
-    public const float Lifetime = 45f;
+    public const float Lifetime = 120f;   // MCP frozen-time latency safety
 
     public int DropId { get; set; }
     public ulong Seed { get; set; }
@@ -76,7 +76,17 @@ public partial class LootDrop : Node3D
 
     public override void _Process(double delta)
     {
-        _age += (float)delta;
+        // MCP bridge freezes (frozen playtester windows) do not consume the
+        // lifetime — otherwise drops vanish between tool calls.
+        var bridge = GetNodeOrNull("/root/MCPGameBridge");
+        bool frozen = false;
+        if (bridge is not null)
+        {
+            var value = bridge.Get("is_stepping");
+            frozen = value.VariantType == Variant.Type.Bool && value.AsBool();
+        }
+        if (!frozen)
+            _age += (float)delta;
         RotateY(Mathf.DegToRad(90f * (float)delta));
         if (_age > Lifetime)
             QueueFree();
