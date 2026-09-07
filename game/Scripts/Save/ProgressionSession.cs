@@ -25,6 +25,18 @@ public static class ProgressionSession
     public static int MatchKills { get; set; }
     public static int MatchXp { get; set; }
 
+    /// <summary>Ranking (Vision 8): MMR snapshot captured at realm entry
+    /// (the central value at card pick) — the results screen shows the delta
+    /// against it. -1 = no central character was selected.</summary>
+    public static int BaseMmr { get; private set; } = -1;
+
+    /// <summary>Ranking (Vision 8): the duel result this session OWNED (this
+    /// client's character was the winner or the loser), mirrored from the
+    /// authority broadcast; the results screen reads it.</summary>
+    public static int? MmrAfter { get; private set; }
+    public static int? MmrDelta { get; private set; }
+    public static string MmrTier { get; private set; } = "";
+
     /// <summary>Loot picked up this match, as FULL items (name + rarity +
     /// ilvl + affixes + slot) — the inventory panel, equipment model and the
     /// gear_json serialization all read this.</summary>
@@ -45,17 +57,44 @@ public static class ProgressionSession
     /// resets the match counters — a new session begins). `gearJson` is the
     /// character's central gear_json at pick time: the bag + equipped items
     /// are RESTORED from it (Vision 8: gear persists across ALL servers).</summary>
-    public static void Select(int id, string name, string classId, int xp, string gearJson)
+    public static void Select(int id, string name, string classId, int xp, string gearJson,
+        int mmr = -1)
     {
         CharacterId = id;
         CharacterName = name;
         ClassId = classId;
         BaseXp = xp;
+        BaseMmr = mmr;
+        MmrAfter = null;
+        MmrDelta = null;
+        MmrTier = "";
         MatchKills = 0;
         MatchXp = 0;
         Loot.Clear();
         Equipped.Clear();
         LoadGear(gearJson);
+    }
+
+    /// <summary>Ranking mirror (Vision 8): the authority broadcast a resolved
+    /// duel. Only the character THIS session picked takes the numbers — every
+    /// peer receives every result, but owns at most one side of it.</summary>
+    public static void OnMmr(long winnerCharacterId, long loserCharacterId, int winnerMmr,
+        int loserMmr, int winnerDelta, int loserDelta, string winnerTier, string loserTier)
+    {
+        if (winnerCharacterId == CharacterId)
+        {
+            MmrAfter = winnerMmr;
+            MmrDelta = winnerDelta;
+            MmrTier = winnerTier;
+            GD.Print($"MMR MIRROR: WON — {MmrAfter} ({MmrDelta:+0;-0}, {MmrTier})");
+        }
+        else if (loserCharacterId == CharacterId)
+        {
+            MmrAfter = loserMmr;
+            MmrDelta = loserDelta;
+            MmrTier = loserTier;
+            GD.Print($"MMR MIRROR: LOST — {MmrAfter} ({MmrDelta:+0;-0}, {MmrTier})");
+        }
     }
 
     /// <summary>Parse central gear_json: a JSON array of item entries. Legacy

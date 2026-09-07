@@ -156,6 +156,12 @@ public partial class TrainingDummy : StaticBody3D, ICombatTarget
         // Static targets never earn progression.
     }
 
+    public void OnMmr(long winnerCharacterId, long loserCharacterId, int winnerMmr,
+        int loserMmr, int winnerDelta, int loserDelta, string winnerTier, string loserTier)
+    {
+        // Static targets never rank.
+    }
+
     // ------------------------------ presentation ---------------------------
 
     public override void _Process(double deltaRaw)

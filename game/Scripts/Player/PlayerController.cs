@@ -80,6 +80,15 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         GD.Print($"{PlayerClassInfo.Label(Class)} PROGRESS {kills} kills, {xp} xp");
     }
 
+    /// <summary>Ranking mirror (Vision 8): delegates to the session, which
+    /// decides whether THIS client owns the winner or the loser character.</summary>
+    public void OnMmr(long winnerCharacterId, long loserCharacterId, int winnerMmr,
+        int loserMmr, int winnerDelta, int loserDelta, string winnerTier, string loserTier)
+    {
+        ProgressionSession.OnMmr(winnerCharacterId, loserCharacterId, winnerMmr,
+            loserMmr, winnerDelta, loserDelta, winnerTier, loserTier);
+    }
+
     private const float FallDuration = 0.45f;
     private float _stunTimer, _fallTimer, _rootTimer;
 

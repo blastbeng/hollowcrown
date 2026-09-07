@@ -7,7 +7,8 @@ using Microsoft.Data.Sqlite;
 // Central server (accounts, characters, server registry, matchmaking, ranking).
 // http://localhost:6560 by default (ASPNETCORE_URLS / --urls override).
 // v0.2: auth (PBKDF2 salted hashes, bearer tokens), characters CRUD, SQLite,
-// heartbeat server registry with 30 s TTL. Elo/MMR endpoints arrive with task 14.
+// heartbeat server registry with 30 s TTL (match-server tokens, Vision 4),
+// Elo/MMR reporting + leaderboard (Vision 8, Rating.cs).
 
 var jsonOptions = new JsonSerializerOptions
 {
@@ -39,6 +40,19 @@ static (long UserId, string Username)? ResolveUser(HttpRequest req, SqliteConnec
     if (!DateTime.TryParse(reader.GetString(2), null, System.Globalization.DateTimeStyles.RoundtripKind, out var expires)
         || expires <= DateTime.UtcNow) return null;
     return (reader.GetInt64(0), reader.GetString(1));
+}
+
+// Resolves the bearer token to a REGISTERED match server; null when unknown.
+// Vision 4: heartbeats, progression PUTs and MMR reports must come from the
+// match server, not from any anonymous client.
+static string? ResolveServer(HttpRequest req, SqliteConnection conn)
+{
+    var header = req.Headers.Authorization.ToString();
+    if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return null;
+    var token = header["Bearer ".Length..].Trim();
+    if (token.Length == 0) return null;
+    var serverId = conn.Scalar("SELECT server_id FROM servers WHERE token = $t", ("$t", token));
+    return serverId is string s ? s : null;
 }
 
 static bool OwnsCharacter(SqliteConnection conn, long userId, int characterId)
@@ -169,6 +183,10 @@ app.MapPut("/characters/{id}/progress", (HttpRequest req, int id, ProgressReques
     var user = ResolveUser(req, conn);
     if (user is null) return Fail(401, "unauthorized");
     if (!OwnsCharacter(conn, user.Value.UserId, id)) return Fail(404, "character not found");
+    // Vision 4: progression is MATCH-SERVER-owned data — the PUT must carry
+    // the server token (the client relays it, but never invents it).
+    if (ResolveServer(req, conn) is null)
+        return Fail(403, "match server token required for progression saves");
 
     // validate reports against sane caps (vision Section 4 anti-cheat stance)
     var level = Math.Clamp(r.Level, 1, MaxLevel);
@@ -183,29 +201,62 @@ app.MapPut("/characters/{id}/progress", (HttpRequest req, int id, ProgressReques
     return Results.Json(ReadCharacter(reader), options: jsonOptions);
 });
 
-// ---------- server registry (30 s TTL) ----------
-app.MapPost("/servers/heartbeat", (ServerRegistration r) =>
+// ---------- server registry (30 s TTL; Vision 4 match-server tokens) ----------
+// Registration mints a server token — the match server's identity for
+// heartbeats, progression saves and MMR reports. Tokens are 64 hex chars,
+// stored plaintext for v1 (same stance as user tokens; hardening later).
+app.MapPost("/servers/register", (ServerRegistration r) =>
 {
     if (string.IsNullOrWhiteSpace(r.ServerId) || string.IsNullOrWhiteSpace(r.Name) || string.IsNullOrWhiteSpace(r.Mode))
         return Fail(400, "serverId, name and mode are required");
     if (r.Port is < 1 or > 65535) return Fail(400, "port must be 1-65535");
-    // Length caps: the registry is publicly writable until server tokens land,
-    // so nothing oversized/unsanitized may reach the DB.
     if (r.ServerId.Length > 64 || r.Name.Length > 64 || r.Mode.Length > 16 ||
         r.Host is { Length: > 64 })
         return Fail(400, "serverId/name/mode/host exceed length limits");
 
     using var conn = Db.Open();
+    // A re-register refreshes the entry (and the token) — the same realm
+    // restarting must not orphan its registry row.
     conn.Exec("""
-        INSERT INTO servers(server_id, name, mode, host, port, players, max_players, has_password, last_seen)
-        VALUES ($sid, $n, $m, $h, $p, $pl, $mx, $pw, $t)
+        INSERT INTO servers(server_id, name, mode, host, port, players, max_players, has_password, last_seen, token)
+        VALUES ($sid, $n, $m, $h, $p, $pl, $mx, $pw, $t, $tok)
+        ON CONFLICT(server_id) DO UPDATE SET
+            name = $n, mode = $m, host = $h, port = $p,
+            players = $pl, max_players = $mx, has_password = $pw, last_seen = $t, token = $tok
+        """,
+        ("$sid", r.ServerId), ("$n", r.Name), ("$m", r.Mode), ("$h", string.IsNullOrWhiteSpace(r.Host) ? "127.0.0.1" : r.Host),
+        ("$p", r.Port), ("$pl", 0), ("$mx", Math.Clamp(r.MaxPlayers, 1, 1000)),
+        ("$pw", r.HasPassword ? 1 : 0), ("$t", Db.Now()),
+        ("$tok", PasswordHasher.NewToken()));
+    var token = (string)conn.Scalar("SELECT token FROM servers WHERE server_id = $sid", ("$sid", r.ServerId))!;
+    return Results.Json(new ServerTokenResponse(r.ServerId, token, Db.Now()), options: jsonOptions);
+});
+
+app.MapPost("/servers/heartbeat", (HttpRequest req, ServerRegistration r) =>
+{
+    if (string.IsNullOrWhiteSpace(r.ServerId) || string.IsNullOrWhiteSpace(r.Name) || string.IsNullOrWhiteSpace(r.Mode))
+        return Fail(400, "serverId, name and mode are required");
+    if (r.Port is < 1 or > 65535) return Fail(400, "port must be 1-65535");
+    if (r.ServerId.Length > 64 || r.Name.Length > 64 || r.Mode.Length > 16 ||
+        r.Host is { Length: > 64 })
+        return Fail(400, "serverId/name/mode/host exceed length limits");
+
+    using var conn = Db.Open();
+    // Token identity (Vision 4): the token must match the registered realm.
+    if (ResolveServer(req, conn) is not { } serverId || serverId != r.ServerId)
+        return Fail(403, "unrecognized server token");
+
+    conn.Exec("""
+        INSERT INTO servers(server_id, name, mode, host, port, players, max_players, has_password, last_seen, token)
+        VALUES ($sid, $n, $m, $h, $p, $pl, $mx, $pw, $t, $tok)
         ON CONFLICT(server_id) DO UPDATE SET
             name = $n, mode = $m, host = $h, port = $p,
             players = $pl, max_players = $mx, has_password = $pw, last_seen = $t
         """,
         ("$sid", r.ServerId), ("$n", r.Name), ("$m", r.Mode), ("$h", string.IsNullOrWhiteSpace(r.Host) ? "127.0.0.1" : r.Host),
         ("$p", r.Port), ("$pl", Math.Clamp(r.Players, 0, 1000)), ("$mx", Math.Clamp(r.MaxPlayers, 1, 1000)),
-        ("$pw", r.HasPassword ? 1 : 0), ("$t", Db.Now()));
+        ("$pw", r.HasPassword ? 1 : 0), ("$t", Db.Now()),
+        ("$tok", (string?)conn.Scalar("SELECT COALESCE((SELECT token FROM servers WHERE server_id = $sid), '')", ("$sid", r.ServerId))));
     return Results.Json(new { ok = true }, options: jsonOptions);
 });
 
@@ -232,7 +283,68 @@ app.MapGet("/servers", (HttpRequest req) =>
     return Results.Json(list, options: jsonOptions);
 });
 
+// ---------- ranking: MMR report + leaderboard (Vision 8) ----------
+// Only a REGISTERED match server may report a result (Vision 4 authority:
+// clients never trust themselves). One Elo per mode; duel is mode 0 for now.
+// Sane caps on reports: sane floors/ceilings instead of raw client numbers.
+app.MapPost("/mmr/report", (HttpRequest req, MmrReport r) =>
+{
+    using var conn = Db.Open();
+    if (ResolveServer(req, conn) is null)
+        return Fail(403, "match server token required");
+    if (r.WinnerCharacterId <= 0 || r.LoserCharacterId <= 0 || r.WinnerCharacterId == r.LoserCharacterId)
+        return Fail(400, "two distinct positive character ids required");
+
+    // Both characters must exist; ratings come from the DB, never the report
+    // (an untrusted client could otherwise rewrite its own rating).
+    using var cmd = conn.Command(
+        "SELECT id, mmr FROM characters WHERE id IN ($w, $l)",
+        ("$w", r.WinnerCharacterId), ("$l", r.LoserCharacterId));
+    using var reader = cmd.ExecuteReader();
+    long? winnerId = null, loserId = null;
+    int winnerMmr = 0, loserMmr = 0;
+    while (reader.Read())
+    {
+        var id = reader.GetInt64(0);
+        if (id == r.WinnerCharacterId) { winnerId = id; winnerMmr = reader.GetInt32(1); }
+        if (id == r.LoserCharacterId) { loserId = id; loserMmr = reader.GetInt32(1); }
+    }
+    if (winnerId is null || loserId is null)
+        return Fail(404, "character not found");
+
+    var (winDelta, loseDelta) = Hollowcrown.Shared.Rating.Update(winnerMmr, loserMmr);
+    int winnerAfter = Hollowcrown.Shared.Rating.Apply(winnerMmr, winDelta);
+    int loserAfter = Hollowcrown.Shared.Rating.Apply(loserMmr, loseDelta);
+    conn.Exec("UPDATE characters SET mmr = $m WHERE id IN ($w, $l)",
+        ("$m", winnerAfter), ("$w", winnerId), ("$l", loserId));
+
+    return Results.Json(new MmrResult(
+        (int)winnerId.Value, (int)loserId.Value, winnerAfter, loserAfter,
+        winnerAfter - winnerMmr, loserAfter - loserMmr,
+        Hollowcrown.Shared.Rating.TierOf(winnerAfter),
+        Hollowcrown.Shared.Rating.TierOf(loserAfter)), options: jsonOptions);
+});
+
+app.MapGet("/leaderboard", (HttpRequest req) =>
+{
+    // Per-mode MMR (Vision 8) — duel is the only scored mode for now, so the
+    // single rating column serves every mode until skirmish/open score.
+    using var conn = Db.Open();
+    using var cmd = conn.Command(
+        "SELECT name, class_id, level, mmr FROM characters ORDER BY mmr DESC, xp DESC LIMIT 50");
+    using var reader = cmd.ExecuteReader();
+    var list = new List<LeaderboardEntry>();
+    while (reader.Read())
+    {
+        int mmr = reader.GetInt32(3);
+        list.Add(new LeaderboardEntry(
+            reader.GetString(0), reader.GetString(1), reader.GetInt32(2), mmr,
+            Hollowcrown.Shared.Rating.TierOf(mmr)));
+    }
+    return Results.Json(list, options: jsonOptions);
+});
+
 // ---------- process liveness ----------
-app.MapGet("/health", () => Results.Json(new HealthResponse("ok", "0.2.0"), options: jsonOptions));
+app.MapGet("/health", () => Results.Json(new HealthResponse("ok", "0.3.0"), options: jsonOptions));
 
 app.Run();

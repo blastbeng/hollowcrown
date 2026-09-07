@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Networking;
@@ -112,6 +113,10 @@ public partial class CharacterSelect : Control
         var enter = new Button { Text = "Server Browser" };
         enter.Pressed += () => EmitSignal(SignalName.OpenServerBrowser);
         box.AddChild(enter);
+
+        var leaderboard = new Button { Text = "Leaderboard" };
+        leaderboard.Pressed += () => _ = ShowLeaderboard();
+        box.AddChild(leaderboard);
         return panel;
     }
 
@@ -157,9 +162,11 @@ public partial class CharacterSelect : Control
         box.AddChild(name);
 
         var level = Progression.LevelForXp(c.Xp);
+        // MMR tiers (Vision 8): rating + tier name on every champion card.
         var detail = new Label
         {
-            Text = $"{c.ClassId} — level {level} — xp {c.Xp} — mmr {c.Mmr}",
+            Text = $"{c.ClassId} — level {level} — xp {c.Xp}\n" +
+                   $"mmr {c.Mmr} — {Rating.TierOf(c.Mmr)}",
         };
         detail.AddThemeColorOverride("font_color", UiTheme.Bone);
         box.AddChild(detail);
@@ -185,10 +192,14 @@ public partial class CharacterSelect : Control
     {
         PlayerController.PendingClass = PlayerClassInfo.FromId(c.ClassId);
         CombatAuthority.PendingClass = c.ClassId;
-        ProgressionSession.Select(c.Id, c.Name, c.ClassId, c.Xp, c.GearJson);
+        // MMR (Vision 8): the handshake must carry WHO is playing (the match
+        // server attributes the Elo result to the central character); the
+        // session snapshots the pick-time rating as the results-screen base.
+        CombatAuthority.PendingCharacterId = c.Id;
+        ProgressionSession.Select(c.Id, c.Name, c.ClassId, c.Xp, c.GearJson, c.Mmr);
         LastPicked = c;
         GD.Print($"CHARACTER PICKED: {c.Name} ({c.ClassId}) id={c.Id} xp={c.Xp} " +
-                 $"gear={c.GearJson} — class armed, session started");
+                 $"mmr={c.Mmr} gear={c.GearJson} — class armed, session started");
         SetStatus($"{c.Name} selected — entering the server browser", UiTheme.Accent);
         EmitSignal(SignalName.CharacterPicked, c.Name);
     }
@@ -217,5 +228,49 @@ public partial class CharacterSelect : Control
     {
         _status.Text = text;
         _status.AddThemeColorOverride("font_color", color);
+    }
+
+    /// <summary>Leaderboard dialog (Vision 8: visible in client): top 50 with
+    /// tier names; refreshes each open. Central unreachable -> error row.</summary>
+    private async System.Threading.Tasks.Task ShowLeaderboard()
+    {
+        var dialog = new AcceptDialog
+        {
+            Title = "LEADERBOARD — DUEL",
+            OkButtonText = "Close",
+            Exclusive = true,
+        };
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(420, 380) };
+        var body = new Label
+        {
+            Text = "loading...",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            CustomMinimumSize = new Vector2(400, 0),
+        };
+        scroll.AddChild(body);
+        dialog.AddChild(scroll);
+        AddChild(dialog);
+        dialog.PopupCentered();
+        dialog.Confirmed += dialog.QueueFree;
+        dialog.Canceled += dialog.QueueFree;
+
+        var entries = await _central.ListLeaderboard();
+        if (entries is null)
+        {
+            body.Text = "could not load leaderboard (central unreachable?)";
+            return;
+        }
+        if (entries.Count == 0)
+        {
+            body.Text = "no ranked champions yet — win rated duels";
+            return;
+        }
+        var lines = new List<string>();
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var e = entries[i];
+            lines.Add($"{i + 1,2}. {e.Name} — {e.Mmr} — {e.Tier} — {e.ClassId} lvl {e.Level}");
+        }
+        body.Text = string.Join("\n", lines);
     }
 }

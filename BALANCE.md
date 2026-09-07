@@ -138,6 +138,25 @@ AND the full session bag as gear_json (loot slice 2).
 |            | class via card pick           | PendingClass + handshake armed from the  |
 |            |                               | card; ENet join spawned Warden at spawn 0|
 
+## Ranking — Elo + tiers (Vision 8; Rating.cs + central /mmr/report + /leaderboard)
+| name            | value   | notes                                            |
+|-----------------|---------|--------------------------------------------------|
+| elo_start       | 1000    | one MMR per mode; duel is mode 0 (only scored mode) |
+| elo_k           | 32      | K-factor, standard Elo                           |
+| elo_expected    | 1/(1+10^((Rb-Ra)/400)) | logistic expected score           |
+| elo_floor       | 100     | rating floor (loss-streak sanity)                |
+| elo_reporter    | match server only | POST /mmr/report needs the SERVER TOKEN (Vision 4); ratings come from the central DB, never from the report body |
+| rated           | PvP duel kills | dummies (id >= 1000) never rank; both sides need central character ids (handshake carries characterId); one result per duel pair per realm session |
+| tier_ash        | 0+      | start tier                                       |
+| tier_iron       | 900+    |                                                  |
+| tier_bronze     | 1050+   |                                                  |
+| tier_silver     | 1150+   |                                                  |
+| tier_gold       | 1250+   |                                                  |
+| tier_obsidian   | 1400+   |                                                  |
+| tier_crown      | 1600+   | top tier                                         |
+| leaderboard     | top 50  | GET /leaderboard (mmr DESC, xp tiebreak); results screen shows top 5, character select dialog shows all |
+| server_tokens   | /servers/register mints | heartbeat + PUT progress + mmr/report require Bearer <server token>; user token still identifies the player on the PUT |
+
 ## Balance harness (Vision 7; CombatBot.cs + tools/balance_harness.sh)
 | name            | value   | notes                                          |
 |-----------------|---------|------------------------------------------------|

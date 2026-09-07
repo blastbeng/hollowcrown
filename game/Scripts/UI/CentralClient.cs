@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Godot;
+using Hollowcrown.Networking;
 using Hollowcrown.Shared;
 using HttpClient = System.Net.Http.HttpClient;
 
@@ -31,10 +32,20 @@ public partial class CentralClient : Node
     public string Username { get; private set; } = "";
     public bool IsAuthenticated => Token.Length > 0;
 
-    public override void _Ready() => LoadToken();
+    /// <summary>Base URL override (DedicatedServer --central; env still wins
+    /// for playtester runs that set HC_CENTRAL_URL).</summary>
+    public string BaseUrl { get; set; } = "";
 
-    private static string BaseUrl() =>
+    private string EffectiveBaseUrl =>
+        OS.GetEnvironment("HC_CENTRAL_URL") is { Length: > 0 } env ? env
+        : BaseUrl.Length > 0 ? BaseUrl : DefaultBaseUrl;
+
+    /// <summary>Env-resolved base URL for static callers (CombatAuthority's
+    /// MMR reporter runs outside any bound client instance).</summary>
+    public static string EnvBaseUrl() =>
         OS.GetEnvironment("HC_CENTRAL_URL") is { Length: > 0 } env ? env : DefaultBaseUrl;
+
+    public override void _Ready() => LoadToken();
 
     public async Task Register(string user, string pass) => await Auth("auth/register", user, pass);
     public async Task Login(string user, string pass) => await Auth("auth/login", user, pass);
@@ -43,7 +54,7 @@ public partial class CentralClient : Node
     {
         try
         {
-            using var resp = await Http.PostAsJsonAsync($"{BaseUrl()}/{path}", new AuthRequest(user, pass), JsonOpts);
+            using var resp = await Http.PostAsJsonAsync($"{EffectiveBaseUrl}/{path}", new AuthRequest(user, pass), JsonOpts);
             if (!resp.IsSuccessStatusCode)
             {
                 EmitSignal(SignalName.AuthFailed, await ErrorText(resp, "rejected by central server"));
@@ -96,8 +107,11 @@ public partial class CentralClient : Node
     {
         try
         {
+            // Vision 4: the PUT now requires the MATCH-SERVER token — the
+            // client relays the server token it received at realm handshake.
             using var resp = await Authed(HttpMethod.Put, $"characters/{characterId}/progress",
-                new ProgressRequest(level, xp, gearJson));
+                new ProgressRequest(level, xp, gearJson),
+                bearer: CombatAuthority.ServerToken);
             return resp.IsSuccessStatusCode
                 ? await resp.Content.ReadFromJsonAsync<CharacterDto>(JsonOpts)
                 : null;
@@ -105,6 +119,56 @@ public partial class CentralClient : Node
         catch (Exception)
         {
             return null;   // caller decides how to surface the failure
+        }
+    }
+
+    /// <summary>Match-server registration (Vision 4): mints the server token
+    /// used for heartbeats, progression saves and MMR reports.</summary>
+    public async Task<ServerTokenResponse?> RegisterServer(ServerRegistration reg)
+    {
+        try
+        {
+            using var resp = await Http.PostAsJsonAsync($"{EffectiveBaseUrl}/servers/register", reg, JsonOpts);
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<ServerTokenResponse>(JsonOpts)
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Elo report (Vision 8): the MATCH SERVER reports the duel
+    /// result; central owns the rating. Returns the applied result.</summary>
+    public async Task<MmrResult?> ReportMmr(MmrReport report)
+    {
+        try
+        {
+            using var resp = await Http.PostAsJsonAsync($"{EffectiveBaseUrl}/mmr/report", report, JsonOpts);
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<MmrResult>(JsonOpts)
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Leaderboard top 50 (Vision 8: visible in client + results).</summary>
+    public async Task<List<LeaderboardEntry>?> ListLeaderboard()
+    {
+        try
+        {
+            using var resp = await Http.GetAsync($"{EffectiveBaseUrl}/leaderboard");
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<List<LeaderboardEntry>>(JsonOpts)
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 
@@ -128,12 +192,13 @@ public partial class CentralClient : Node
         }
     }
 
-    /// <summary>Match-server registry heartbeat (unauthenticated by design for now).</summary>
+    /// <summary>Match-server registry heartbeat — carries the server token
+    /// minted at /servers/register (Vision 4).</summary>
     public async Task<bool> Heartbeat(ServerRegistration reg)
     {
         try
         {
-            using var resp = await Http.PostAsJsonAsync($"{BaseUrl()}/servers/heartbeat", reg, JsonOpts);
+            using var resp = await Http.PostAsJsonAsync($"{EffectiveBaseUrl}/servers/heartbeat", reg, JsonOpts);
             return resp.IsSuccessStatusCode;
         }
         catch (Exception)
@@ -142,10 +207,16 @@ public partial class CentralClient : Node
         }
     }
 
-    private async Task<HttpResponseMessage> Authed(HttpMethod method, string path, object? body = null)
+    /// <summary>Authed request. The user token goes on everything; match-server
+    /// routes additionally carry the SERVER token (Vision 4 authority split:
+    /// user token identifies the player, server token identifies the realm).</summary>
+    private async Task<HttpResponseMessage> Authed(HttpMethod method, string path,
+        object? body = null, string? bearer = null)
     {
-        var req = new HttpRequestMessage(method, $"{BaseUrl()}/{path}");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        var req = new HttpRequestMessage(method, $"{EffectiveBaseUrl}/{path}");
+        var token = bearer ?? Token;
+        if (token.Length > 0)
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         if (body is not null)
         {
             req.Content = new StringContent(

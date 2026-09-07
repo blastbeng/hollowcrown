@@ -234,10 +234,13 @@ public partial class Main : Node3D
         if (saved is not null)
         {
             _central.SelectedCharacter = saved;
-            results.SetSaveStatus($"progress saved — level {saved.Level}, xp {saved.Xp}, " +
+            var mmrNote = ProgressionSession.MmrAfter is { } m
+                ? $", mmr {m} ({ProgressionSession.MmrDelta:+0;-0} {ProgressionSession.MmrTier})"
+                : "";
+            results.SetSaveStatus($"progress saved — level {saved.Level}, xp {saved.Xp}{mmrNote}, " +
                                   $"{ProgressionSession.Loot.Count} item(s) in gear", true);
             GD.Print($"PROGRESS SAVED: character {saved.Id} level={saved.Level} xp={saved.Xp} " +
-                     $"gear={saved.GearJson}");
+                     $"mmr={saved.Mmr} gear={saved.GearJson}");
         }
         else
         {

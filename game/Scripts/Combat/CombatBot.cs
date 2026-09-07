@@ -45,6 +45,10 @@ public partial class CombatBot : CharacterBody3D, ICombatTarget
     public void OnHealed(int hpAfter) => Hp = Mathf.Clamp(hpAfter, 0, MaxHp);
     public void OnProgress(int kills, int xp) { }
 
+    public void OnMmr(long winnerCharacterId, long loserCharacterId, int winnerMmr,
+        int loserMmr, int winnerDelta, int loserDelta, string winnerTier, string loserTier)
+    { }
+
     public void OnHitApplied(int amount, bool heavy, int hpAfter)
     {
         if (amount > 0)

@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Save;
+using Hollowcrown.Shared;
 
 namespace Hollowcrown.UI;
 
@@ -49,6 +51,39 @@ public partial class ResultsScreen : CanvasLayer
         AddSeparator(box);
         AddRow(box, "KILLS", ProgressionSession.MatchKills.ToString());
         AddRow(box, "XP EARNED", $"+{ProgressionSession.MatchXp}");
+
+        // MMR (Vision 8): when this session's duel was RATED (both sides had
+        // central characters), show rating, delta and the new tier.
+        if (ProgressionSession.MmrAfter is { } mmrAfter)
+        {
+            int delta = ProgressionSession.MmrDelta ?? 0;
+            var mmrLabel = AddRow(box, "MMR",
+                $"{mmrAfter} ({delta:+0;-0}) — {ProgressionSession.MmrTier}");
+            mmrLabel.AddThemeColorOverride("font_color",
+                delta >= 0 ? UiTheme.Accent : UiTheme.Danger);
+        }
+        else
+        {
+            AddRow(box, "MMR", "unrated");
+        }
+
+        // Leaderboard top 5 (Vision 8: visible in the results screen).
+        var lb = new Label
+        {
+            Text = "LEADERBOARD",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        lb.AddThemeFontSizeOverride("font_size", 18);
+        lb.AddThemeColorOverride("font_color", UiTheme.Accent);
+        box.AddChild(lb);
+        var lbBody = new Label
+        {
+            Text = "loading...",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        lbBody.AddThemeFontSizeOverride("font_size", 12);
+        box.AddChild(lbBody);
+        _ = LoadLeaderboard(lbBody);
 
         // Loot gained (Vision 8 loot slice 2): full items with affixes —
         // what dropped, was picked up, and now persists in gear_json.
@@ -123,11 +158,39 @@ public partial class ResultsScreen : CanvasLayer
         _saveStatus.AddThemeColorOverride("font_color", ok ? UiTheme.Accent : UiTheme.Danger);
     }
 
+    /// <summary>Leaderboard top 5 (Vision 8: visible on the results screen).
+    /// Central unreachable -> quiet failure line; never blocks the screen.</summary>
+    private async System.Threading.Tasks.Task LoadLeaderboard(Label body)
+    {
+        // Results screens are built after the menu CentralClient may be gone
+        // (LeaveRealm path) — a temporary HTTP node does the query itself.
+        var client = new CentralClient { Name = "LeaderboardQuery" };
+        AddChild(client);
+        var entries = await client.ListLeaderboard();
+        client.QueueFree();
+        if (entries is null || !GodotObject.IsInstanceValid(body) || !body.IsInsideTree())
+            return;   // the screen was closed while the query was in flight
+        if (entries.Count == 0)
+        {
+            body.Text = "no ranked champions yet";
+            return;
+        }
+        var lines = new List<string>();
+        for (int i = 0; i < System.Math.Min(5, entries.Count); i++)
+        {
+            var e = entries[i];
+            lines.Add($"{i + 1}. {e.Name} — {e.Mmr} ({e.Tier})");
+        }
+        body.Text = string.Join("\n", lines);
+    }
+
     /// <summary>Playtester hook: close via exec (no OS cursor click needed).
     /// Emits the same signal the Continue button does.</summary>
     public void Close() => EmitSignal(SignalName.Closed);
 
-    private void AddRow(Control box, string key, string value)
+    /// <summary>Row builder; returns the VALUE label so callers can restyle
+    /// it (MMR delta colors).</summary>
+    private Label AddRow(Control box, string key, string value)
     {
         var row = new HBoxContainer();
         box.AddChild(row);
@@ -139,6 +202,7 @@ public partial class ResultsScreen : CanvasLayer
         v.AddThemeFontSizeOverride("font_size", 16);
         v.AddThemeColorOverride("font_color", UiTheme.Bone);
         row.AddChild(v);
+        return v;
     }
 
     private void AddSeparator(Control box)

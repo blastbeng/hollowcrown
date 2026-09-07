@@ -3,6 +3,8 @@ using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Player;
 using Hollowcrown.Save;
+using Hollowcrown.Shared;
+using Hollowcrown.UI;
 using Hollowcrown.World;
 
 namespace Hollowcrown.Networking;
@@ -62,6 +64,27 @@ public partial class CombatAuthority : Node
     /// names and so every peer spawns the right enemy model variant.</summary>
     public static string PendingClass = "warden";
 
+    /// <summary>Central character id of the NEXT outbound connection (MMR
+    /// Vision 8: the match server reports Elo per CHARACTER, so the handshake
+    /// must carry who is playing). 0 = no central character (offline/test).</summary>
+    public static long PendingCharacterId;
+
+    /// <summary>Match-server token (Vision 4): set by DedicatedServer at
+    /// registration, relayed by the CLIENT on progression saves (the server
+    /// token identifies the realm; the user token identifies the player).</summary>
+    public static string ServerToken = "";
+
+    /// <summary>Central base URL the match server reports MMR against (set by
+    /// DedicatedServer from --central / HC_CENTRAL_URL; default when unset).</summary>
+    public static string CentralBaseUrl = CentralClient.EnvBaseUrl();
+
+    /// <summary>Vision 8: fired when the AUTHORITY resolves a duel Elo result
+    /// (central applied) — the results screen + HUD read the session mirror;
+    /// the signal exists for killfeed-style surfacing later.</summary>
+    [Signal] public delegate void MmrResolvedEventHandler(long winnerCharacterId, long loserCharacterId,
+        int winnerMmr, int loserMmr, int winnerDelta, int loserDelta,
+        string winnerTier, string loserTier);
+
     /// <summary>Loot slice 2 (Vision 8): derived max HP for a peer — base 100
     /// + vitality affixes on the session's equipped gear (BALANCE.md affix
     /// table). Only the LOCAL session is known here; remote peers' gear
@@ -76,6 +99,7 @@ public partial class CombatAuthority : Node
         public bool Approved;
         public int SpawnIndex;
         public string ClassId = "warden";
+        public long CharacterId;          // central character (MMR attribution)
         public Vector3 Position;
         public float Yaw;
         public ICombatTarget? Target;
@@ -110,6 +134,10 @@ public partial class CombatAuthority : Node
         public void OnKilled() { }
         public void OnRespawned(int hpAfter, Vector3 spawnPos) { }
         public void OnProgress(int kills, int xp) { }
+
+        public void OnMmr(long winnerCharacterId, long loserCharacterId, int winnerMmr,
+            int loserMmr, int winnerDelta, int loserDelta, string winnerTier, string loserTier)
+        { }
     }
 
     private readonly Dictionary<int, PeerInfo> _peers = new();
@@ -131,6 +159,11 @@ public partial class CombatAuthority : Node
     // local player's mirror feeds the HUD and the results screen.
     private readonly Dictionary<int, int> _kills = new();
     private readonly Dictionary<int, int> _xp = new();
+    // Ranking (Vision 8): ONE Elo resolution per duel pair per realm session
+    // (a duel mode match ends at the first kill — respawn rematches inside
+    // the same realm are free warmup, not new rated results). A fresh realm
+    // (new authority node) reports again.
+    private readonly HashSet<(int Winner, int Loser)> _mmrReported = new();
     private int _nextDropId = 1;
     private int _nextSmokeZone;
     private double _lootScanAccum;
@@ -217,13 +250,13 @@ public partial class CombatAuthority : Node
 
     private void SendHandshake()
     {
-        RpcId(1, nameof(HandshakeRpc), PendingPassword, PendingClass);
-        GD.Print("REALM: handshake sent — awaiting approval");
+        RpcId(1, nameof(HandshakeRpc), PendingPassword, PendingClass, PendingCharacterId);
+        GD.Print($"REALM: handshake sent (character={PendingCharacterId}) — awaiting approval");
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void HandshakeRpc(string password, string classId)
+    private void HandshakeRpc(string password, string classId, long characterId)
     {
         int peer = Multiplayer.GetRemoteSenderId();
         if (!_peers.TryGetValue(peer, out var info))
@@ -242,6 +275,7 @@ public partial class CombatAuthority : Node
         // Always apply the DECLARED class (the connect event may have won the
         // race and created the record with the default id).
         info.ClassId = classId;
+        info.CharacterId = characterId;
 
         if (password != DedicatedServer.RealmPassword)
         {
@@ -729,6 +763,10 @@ public partial class CombatAuthority : Node
             AwardKillXp(attackerPeer, victimId, victim);
             SpawnLootDrop(victimId, victim.CombatPosition,
                 _kills.TryGetValue(attackerPeer, out int kk) ? kk : 0);
+            // Vision 8 ranking: PvP kills resolve a duel Elo result (server
+            // -> central). Dummies (id >= 1000) never rank.
+            if (victimId < 1000)
+                ReportMmr(attackerPeer, victimId, victim);
             GD.Print($"AUTHORITY: KILL attacker={PeerName(attackerPeer)} " +
                      $"victim={victim.DisplayName}");
         }
@@ -765,6 +803,84 @@ public partial class CombatAuthority : Node
     {
         if (_targets.TryGetValue(peerId, out var target))
             target.OnProgress(kills, xp);
+    }
+
+    // ------------------------------ ranking (Vision 8) -----------------------
+
+    /// <summary>Duel resolved: the MATCH SERVER reports Elo to central (its
+    /// token authorizes it) and broadcasts the applied result to every peer.
+    /// Only PvP kills report — the training dummy is not a ranked opponent.
+    /// Characters without a central id (offline/test, harness bots) skip.
+    /// </summary>
+    private void ReportMmr(int winnerPeer, int loserPeer, ICombatTarget loser)
+    {
+        if (_mmrReported.Contains((winnerPeer, loserPeer)))
+            return;                          // one Elo per resolved duel
+        _mmrReported.Add((winnerPeer, loserPeer));
+
+        long winnerChar = _peers.TryGetValue(winnerPeer, out var w) ? w.CharacterId : 0;
+        long loserChar = _peers.TryGetValue(loserPeer, out var l) ? l.CharacterId : 0;
+        if (winnerChar <= 0 || loserChar <= 0)
+        {
+            GD.Print($"AUTHORITY: MMR skipped ({PeerName(winnerPeer)} vs {loser.DisplayName}) " +
+                     "— no central character on one side (offline/test)");
+            return;
+        }
+        if (ServerToken.Length == 0)
+        {
+            // A realm that never registered (listen-host client flow) cannot
+            // report: log it — Elo only flows from token-holding realms.
+            GD.Print("AUTHORITY: MMR skipped — realm has no central server token");
+            return;
+        }
+
+        var reporter = new CentralClient { Name = "MmrReporter" };
+        AddChild(reporter);
+        _ = ReportMmrAsync(reporter, winnerChar, loserChar);
+    }
+
+    private async System.Threading.Tasks.Task ReportMmrAsync(CentralClient reporter,
+        long winnerChar, long loserChar)
+    {
+        var result = await reporter.ReportMmr(new MmrReport(
+            ServerToken, 0, winnerChar, loserChar, 0, 0));
+        reporter.QueueFree();
+        if (result is null)
+        {
+            GD.PrintErr("AUTHORITY: MMR REPORT FAILED — central unreachable or rejected");
+            return;
+        }
+        SendMmrResult(result);
+        GD.Print($"AUTHORITY: MMR +{result.WinnerDelta} winner_char={result.WinnerCharacterId} " +
+                 $"-> {result.WinnerMmr} ({result.WinnerTier}) | " +
+                 $"{result.LoserDelta} loser_char={result.LoserCharacterId} " +
+                 $"-> {result.LoserMmr} ({result.LoserTier})");
+    }
+
+    private void SendMmrResult(MmrResult result)
+    {
+        if (Networked)
+            Rpc(nameof(MmrRpc), result.WinnerCharacterId, result.LoserCharacterId,
+                result.WinnerMmr, result.LoserMmr, result.WinnerDelta, result.LoserDelta,
+                result.WinnerTier, result.LoserTier);
+        else
+            MmrRpc(result.WinnerCharacterId, result.LoserCharacterId, result.WinnerMmr,
+                result.LoserMmr, result.WinnerDelta, result.LoserDelta,
+                result.WinnerTier, result.LoserTier);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void MmrRpc(long winnerCharacterId, long loserCharacterId,
+        int winnerMmr, int loserMmr, int winnerDelta, int loserDelta,
+        string winnerTier, string loserTier)
+    {
+        // Each peer mirrors ONLY ITS OWN session MMR (the mirror lives in the
+        // session; remote peers' MMR stays on central until the card refresh).
+        ProgressionSession.OnMmr(winnerCharacterId, loserCharacterId,
+            winnerMmr, loserMmr, winnerDelta, loserDelta, winnerTier, loserTier);
+        EmitSignal(SignalName.MmrResolved, winnerCharacterId, loserCharacterId,
+            winnerMmr, loserMmr, winnerDelta, loserDelta, winnerTier, loserTier);
     }
 
     // ------------------------------ loot (Vision 8) -------------------------

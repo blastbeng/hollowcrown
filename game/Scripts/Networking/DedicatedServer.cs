@@ -6,8 +6,9 @@ namespace Hollowcrown.Networking;
 
 /// <summary>
 /// Dedicated match server (vision Section 1/4): same binary, launched with
-/// --server. Hosts an ENet realm, heartbeats the central registry every 20 s
-/// (TTL 30 s) so it appears in the server browser. Flags: --port N, --name "x",
+/// --server. Hosts an ENet realm, REGISTERS at the central registry (mints a
+/// match-server token, Vision 4) and heartbeats every 20 s (TTL 30 s) so it
+/// appears in the server browser. Flags: --port N, --name "x",
 /// --password "x", --max-players N, --mode duel|skirmish|open, --central URL.
 /// </summary>
 public partial class DedicatedServer : Node
@@ -17,6 +18,7 @@ public partial class DedicatedServer : Node
     public static string RealmPassword = "";
 
     private CentralClient _central = null!;
+    private string _serverToken = "";   // minted by /servers/register (Vision 4)
     private string _serverId = "";
     private string _name = "Hollowcrown Realm";
     private string _mode = "duel";
@@ -49,13 +51,13 @@ public partial class DedicatedServer : Node
                  $"max_players={_maxPlayers} password={(_password.Length > 0 ? "yes" : "no")} " +
                  $"central={_centralUrl}");
 
-        _central = new CentralClient { Name = "Central" };
+        _central = new CentralClient { Name = "Central", BaseUrl = _centralUrl };
         AddChild(_central);
 
         var heartbeat = new Timer { WaitTime = 20.0, Autostart = true };
         heartbeat.Timeout += () => _ = Beat();
         AddChild(heartbeat);
-        _ = Beat();
+        _ = Register();
     }
 
     private void ParseArgs(string[] args)
@@ -92,11 +94,35 @@ public partial class DedicatedServer : Node
         }
     }
 
+    /// <summary>Register the realm (mints the match-server token). Idempotent
+    /// on failure: Beat retries until a token exists (Vision 4).</summary>
+    private async System.Threading.Tasks.Task Register()
+    {
+        var resp = await _central.RegisterServer(new ServerRegistration(
+            _serverId, _name, _mode, "", _port, 0, _maxPlayers,
+            _password.Length > 0));
+        if (resp is not null)
+        {
+            _serverToken = resp.Token;
+            CombatAuthority.ServerToken = resp.Token;
+            GD.Print($"SERVER_REGISTERED central_id={resp.ServerId} token={resp.Token[..8]}…");
+        }
+        else
+        {
+            GD.PrintErr("SERVER_REGISTER_FAILED: central unreachable? — will retry");
+        }
+    }
+
     private async System.Threading.Tasks.Task Beat()
     {
+        if (_serverToken.Length == 0)
+        {
+            await Register();   // registration failed at boot: retry on the beat
+            return;
+        }
         var ok = await _central.Heartbeat(new ServerRegistration(
             _serverId, _name, _mode, "", _port, _players, _maxPlayers,
-            _password.Length > 0));
+            _password.Length > 0, _serverToken));
         if (!ok) GD.PrintErr("SERVER_HEARTBEAT_FAILED: central unreachable?");
     }
 }

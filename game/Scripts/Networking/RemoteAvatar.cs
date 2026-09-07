@@ -179,4 +179,10 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
     {
         // Puppets don't own progression — the owning client mirrors its own.
     }
+
+    public void OnMmr(long winnerCharacterId, long loserCharacterId, int winnerMmr,
+        int loserMmr, int winnerDelta, int loserDelta, string winnerTier, string loserTier)
+    {
+        // Puppets don't own MMR — the owning client mirrors its own session.
+    }
 }

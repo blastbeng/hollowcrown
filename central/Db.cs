@@ -48,6 +48,19 @@ public static class Db
                 last_seen TEXT NOT NULL
             );
             """);
+
+        // Migration in code (vision Section 4): the match-server token column
+        // (Vision 4) ships after the first schema — ALTER only when missing.
+        using (var check = conn.Command("PRAGMA table_info(servers)"))
+        using (var reader = check.ExecuteReader())
+        {
+            bool hasToken = false;
+            while (reader.Read())
+                if (reader.GetString(1) == "token")
+                    hasToken = true;
+            if (!hasToken)
+                conn.Exec("ALTER TABLE servers ADD COLUMN token TEXT NOT NULL DEFAULT ''");
+        }
     }
 
     public static SqliteConnection Open()

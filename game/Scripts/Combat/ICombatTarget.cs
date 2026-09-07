@@ -60,4 +60,10 @@ public interface ICombatTarget
     /// LOCAL player's mirror — the HUD/results read this. Most targets
     /// ignore it.</summary>
     void OnProgress(int kills, int xp);
+
+    /// <summary>Authority broadcast (Vision 8 ranking): a duel Elo result
+    /// resolved by the match server. Only the LOCAL player's session mirror
+    /// takes it; every other implementor ignores it.</summary>
+    void OnMmr(long winnerCharacterId, long loserCharacterId, int winnerMmr,
+        int loserMmr, int winnerDelta, int loserDelta, string winnerTier, string loserTier);
 }
