@@ -613,11 +613,19 @@ public partial class CombatAuthority : Node
         }
 
         var key = (attackerPeer, attackId);
+        // Gear haste (loot slice 3, Vision 8): equipped haste affixes shrink
+        // the SERVER-side interval floor for this peer (BALANCE.md) — 0.01 s
+        // per point, capped at half speed. Only the LOCAL session's gear is
+        // known to the server (same limitation as the ward/vitality mirrors).
+        float hasteMult = attackerPeer == MyPeerId || (attackerPeer >= 500 && attackerPeer < 1000)
+            ? 1f - Mathf.Min(CombatTables.HasteCapMultiplier,
+                  (float)(ProgressionSession.DerivedHaste * CombatTables.HastePerPoint))
+            : 1f;
         if (_lastHitAt.TryGetValue(key, out double last) &&
-            now - last < atk.MinInterval - 0.05)
+            now - last < atk.MinInterval * hasteMult - 0.05)
         {
             Reject($"hit victim={victimId} peer={attackerPeer}: cooldown " +
-                   $"({now - last:0.00}s < {atk.MinInterval:0.00}s)");
+                   $"({now - last:0.00}s < {atk.MinInterval * hasteMult:0.00}s)");
             return;
         }
 

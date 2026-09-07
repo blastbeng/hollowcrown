@@ -47,6 +47,11 @@ public partial class WardenModel : Node3D
     private string? _oneshot;
     private string _locomotionClip = ClipIdle;
     private bool _dead;
+    // Loot slice 3 (Vision 8): the class-default weapon meshes live in these
+    // sockets; a loot weapon swaps in over them (and back out on unequip).
+    private Node3D? _primarySocket;
+    private Node3D? _secondarySocket;
+    private Node3D? _weaponOverride;
 
     /// <summary>False (default): the local warden's bone-white plate. True:
     /// colder, darker steel for ENEMY wardens so the silhouettes stay
@@ -225,6 +230,7 @@ public partial class WardenModel : Node3D
         string? rightHand = FindBone(skeleton, "RightHand");
         if (rightHand is not null)
             sword.BoneName = rightHand;
+        _primarySocket = sword;   // loot slice 3: loot weapons swap in here
 
         var blade = new MeshInstance3D
         {
@@ -255,6 +261,7 @@ public partial class WardenModel : Node3D
         string? leftHand = FindBone(skeleton, "LeftHand");
         if (leftHand is not null)
             shield.BoneName = leftHand;
+        _secondarySocket = shield;
 
         var plate = new MeshInstance3D
         {
@@ -284,6 +291,10 @@ public partial class WardenModel : Node3D
             string? found = FindBone(skeleton, bone);
             if (found is not null)
                 socket.BoneName = found;
+            if (name == "DaggerSocketR")
+                _primarySocket = socket;  // loot slice 3: loot weapons swap in here
+            else
+                _secondarySocket = socket;
 
             var blade = new MeshInstance3D
             {
@@ -320,6 +331,7 @@ public partial class WardenModel : Node3D
         string? rightHand = FindBone(skeleton, "RightHand");
         if (rightHand is not null)
             staffSocket.BoneName = rightHand;
+        _primarySocket = staffSocket;   // loot slice 3: loot weapons swap in here
 
         var shaft = new MeshInstance3D
         {
@@ -457,6 +469,153 @@ public partial class WardenModel : Node3D
         _ghostAlpha = Mathf.Clamp(alpha, 0.05f, 1f);
         if (!_dead)
             SetFadeAlpha(_ghostAlpha);
+    }
+
+    // ------------------- Loot weapon visuals (loot slice 3) -------------------
+
+    /// <summary>Loot slice 3 (Vision 8): equipment changes the character's
+    /// look — an equipped WEAPON item replaces the class-default weapon mesh
+    /// on the primary hand socket and takes the rarity stain (steel lerped
+    /// 40% toward the rarity color when rare+). Rarity + weapon type ARE the
+    /// tell at iso zoom.</summary>
+    public void ApplyEquippedWeapon(Hollowcrown.Save.ItemGenerator.Item? item)
+    {
+        // Clear any previous loot weapon first (unequip + re-equip + swap).
+        if (_weaponOverride is not null)
+        {
+            _primarySocket?.RemoveChild(_weaponOverride);
+            _weaponOverride.QueueFree();
+            _weaponOverride = null;
+        }
+        if (item is null)
+        {
+            // Class defaults back on (sockets are always built in _Ready).
+            if (_primarySocket is not null) _primarySocket.Visible = true;
+            if (_secondarySocket is not null) _secondarySocket.Visible = true;
+            GD.Print($"WEAPON EQUIP: class default restored ({WeaponSummary()})");
+            return;
+        }
+        // Hide the class-default primary (and the twin/hood pair where the
+        // socket model used two pieces) while the loot weapon is carried.
+        if (_primarySocket is not null) _primarySocket.Visible = false;
+        if (_secondarySocket is not null) _secondarySocket.Visible = false;
+
+        _weaponOverride = BuildLootWeapon(item);
+        if (_primarySocket is not null)
+            _primarySocket.AddChild(_weaponOverride);
+        GD.Print($"WEAPON EQUIP: {item.Name} " +
+                 $"({Hollowcrown.Save.ItemGenerator.RarityLabel(item.Rarity)}) " +
+                 $"attaches to the hand socket ({WeaponKind(item.Name)})");
+    }
+
+    private static string WeaponKind(string name)
+    {
+        if (name.Contains("Dagger")) return "dagger";
+        if (name.Contains("Staff")) return "staff";
+        return "blade";
+    }
+
+    /// <summary>Procedural loot weapon mesh (Vision 6.4 scale: greatsword
+    /// 1.4 m / dagger 0.35 m / staff 1.7 m) with a rarity-stained steel head.
+    /// Primitives + MaterialFactory (Blender MCP unavailable — same fallback
+    /// the rest of the project uses).</summary>
+    private Node3D BuildLootWeapon(Hollowcrown.Save.ItemGenerator.Item item)
+    {
+        string kind = WeaponKind(item.Name);
+        bool stained = (int)item.Rarity >= (int)Hollowcrown.Save.ItemGenerator.Rarity.Rare;
+        var steel = new StandardMaterial3D
+        {
+            AlbedoTexture = MaterialFactory.WeaponSteel().AlbedoTexture,
+            AlbedoColor = stained
+                ? new Color("d8dde6").Lerp(
+                      Hollowcrown.Save.ItemGenerator.RarityColor(item.Rarity), 0.4f)
+                : new Color("d8dde6"),
+            Roughness = 0.35f,
+            Metallic = 0.65f,
+        };
+        var gripMat = MaterialFactory.DarkWood();
+
+        var root = new Node3D { Name = "LootWeapon" };
+        if (kind == "dagger")
+        {
+            var blade = new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.045f, 0.28f, 0.012f) },
+                Position = new Vector3(0f, 0.17f, 0.015f),
+                MaterialOverride = steel,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            };
+            var guard = new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.10f, 0.02f, 0.035f) },
+                Position = new Vector3(0f, 0.025f, 0.015f),
+                MaterialOverride = MaterialFactory.DarkStone(),
+            };
+            var grip = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.012f, BottomRadius = 0.012f, Height = 0.11f },
+                RotationDegrees = new Vector3(0f, 0f, 90f),
+                Position = new Vector3(0f, -0.035f, 0.015f),
+                MaterialOverride = gripMat,
+            };
+            root.AddChild(blade);
+            root.AddChild(guard);
+            root.AddChild(grip);
+        }
+        else if (kind == "staff")
+        {
+            var shaft = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.024f, BottomRadius = 0.03f, Height = 1.7f },
+                Position = new Vector3(0f, 0.55f, 0.03f),
+                MaterialOverride = gripMat,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            };
+            var gem = new MeshInstance3D
+            {
+                Mesh = new SphereMesh { Radius = 0.06f, Height = 0.12f },
+                Position = new Vector3(0f, 1.42f, 0.03f),
+                MaterialOverride = new StandardMaterial3D
+                {
+                    AlbedoColor = new Color(0.42f, 0.29f, 0.54f, 1f),
+                    EmissionEnabled = true,
+                    Emission = stained
+                        ? Hollowcrown.Save.ItemGenerator.RarityColor(item.Rarity)
+                        : new Color(0.42f, 0.29f, 0.54f, 1f),
+                    EmissionEnergyMultiplier = 1.8f,
+                    Roughness = 0.3f,
+                },
+            };
+            root.AddChild(shaft);
+            root.AddChild(gem);
+        }
+        else // blade (greatsword)
+        {
+            var blade = new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.07f, 1.25f, 0.015f) },
+                Position = new Vector3(0f, 0.62f, 0.02f),
+                MaterialOverride = steel,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            };
+            var guard = new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = new Vector3(0.26f, 0.045f, 0.05f) },
+                Position = new Vector3(0f, 0.02f, 0.02f),
+                MaterialOverride = steel,
+            };
+            var grip = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.018f, BottomRadius = 0.018f, Height = 0.22f },
+                RotationDegrees = new Vector3(0f, 0f, 90f),
+                Position = new Vector3(0f, -0.11f, 0.02f),
+                MaterialOverride = gripMat,
+            };
+            root.AddChild(blade);
+            root.AddChild(guard);
+            root.AddChild(grip);
+        }
+        return root;
     }
 
     // --------------------- Equipment visuals (loot slice 2) -------------------

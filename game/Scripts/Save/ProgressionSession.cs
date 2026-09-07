@@ -69,7 +69,7 @@ public static class ProgressionSession
             Loot.Add(item);
             // Persisted equipped state: re-equip into its slot (last write
             // wins; a malformed/duplicate-slot bag equips the newest).
-            if (item.Affixes.Count > 0)
+            if (item.Affixes.Count > 0 || item.Slot == ItemGenerator.EquipSlot.Weapon)
                 Equipped[item.Slot] = item;
         }
     }
@@ -88,8 +88,16 @@ public static class ProgressionSession
         return true;
     }
 
-    // (Swap = equipping another item into the same slot; a dedicated unequip
-    // UX is a later task.)
+    /// <summary>Loot slice 3 (Vision 8): remove the item from its slot — it
+    /// stays in the bag (the bag IS the persistence source). Returns the
+    /// removed item, or null when the slot was already empty.</summary>
+    public static ItemGenerator.Item? Unequip(ItemGenerator.EquipSlot slot)
+    {
+        if (!Equipped.Remove(slot, out var removed))
+            return null;
+        GD.Print($"UNEQUIPPED: {removed.Name} <- {slot} (back in the bag)");
+        return removed;
+    }
 
     public static ItemGenerator.Item? EquippedItem(ItemGenerator.EquipSlot slot) =>
         Equipped.TryGetValue(slot, out var item) ? item : null;

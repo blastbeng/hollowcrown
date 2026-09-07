@@ -142,7 +142,7 @@ public partial class InventoryPanel : CanvasLayer
 
         var note = new Label
         {
-            Text = "stats from equipped affixes:\nmax hp / damage mult / ward pool",
+            Text = "stats from equipped affixes:\nmax hp / damage mult / ward pool / swing speed",
         };
         note.AddThemeFontSizeOverride("font_size", 11);
         note.AddThemeColorOverride("font_color", UiTheme.ColdSteel);
@@ -177,7 +177,9 @@ public partial class InventoryPanel : CanvasLayer
 
         _statSummary.Text = $"max hp {ProgressionSession.DerivedMaxHp}   " +
                             $"dmg x{ProgressionSession.DerivedDamageMult:0.00}   " +
-                            $"ward {ProgressionSession.DerivedWard}";
+                            $"ward {ProgressionSession.DerivedWard}\n" +
+                            $"haste {ProgressionSession.DerivedHaste}   " +
+                            $"swing -{ProgressionSession.DerivedHaste * 0.01:0.00}s";
     }
 
     private Control BuildBagRow(ItemGenerator.Item item)
@@ -234,6 +236,22 @@ public partial class InventoryPanel : CanvasLayer
         label.AddThemeColorOverride("font_color",
             item is null ? UiTheme.ColdSteel : UiTheme.Bone);
         row.AddChild(label);
+
+        // Loot slice 3 (Vision 8): unequip UX — the item returns to the bag,
+        // the class-default weapon comes back for the Weapon slot.
+        if (item is not null)
+        {
+            var unequip = new Button { Text = "Unequip", CustomMinimumSize = new Vector2(84, 0) };
+            unequip.Pressed += () =>
+            {
+                if (ProgressionSession.Unequip(slot) is not null)
+                {
+                    CombatAuthority.For(this)?.RequestEquip();   // broadcast (tint + weapon swap)
+                    Refresh();
+                }
+            };
+            row.AddChild(unequip);
+        }
         return row;
     }
 

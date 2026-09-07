@@ -18,9 +18,10 @@ public static class ItemGenerator
     public readonly record struct Affix(string Stat, int Value);
 
     /// <summary>Equipment slot derived from the base name (Vision 8:
-    /// equipment changes tint/attached meshes). All current bases are body
-    /// armor; weapon bases land with the weapon-drops task.</summary>
-    public enum EquipSlot { Body }
+    /// equipment changes tint/attached meshes). Loot slice 3: weapon bases
+    /// land in the Weapon slot (a loot weapon attaches to the hand socket
+    /// and hides the class-default weapon).</summary>
+    public enum EquipSlot { Body, Weapon }
 
     public sealed record Item(
         string Name, Rarity Rarity, int ItemLevel, IReadOnlyList<Affix> Affixes,
@@ -50,9 +51,9 @@ public static class ItemGenerator
     private static readonly System.Collections.Generic.Dictionary<string, EquipSlot>
         BaseSlots = new()
         {
-            ["Blade"] = EquipSlot.Body,      // weapon bases are Body until the
-            ["Dagger"] = EquipSlot.Body,     // weapon-slot task lands
-            ["Staff"] = EquipSlot.Body,
+            ["Blade"] = EquipSlot.Weapon,    // loot slice 3: weapon drops equip
+            ["Dagger"] = EquipSlot.Weapon,   // into the Weapon slot (mesh attach)
+            ["Staff"] = EquipSlot.Weapon,
             ["Crown"] = EquipSlot.Body,
             ["Gauntlets"] = EquipSlot.Body,
             ["Pauldrons"] = EquipSlot.Body,

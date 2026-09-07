@@ -456,12 +456,14 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
             ApplyEquipmentLook();
     }
 
-    /// <summary>Equipment changes the character's tint: equipped rare+ gear
-    /// stains the body accent (WardenModel.ApplyEquipmentTint).</summary>
+    /// <summary>Equipment changes the character's look: equipped rare+ gear
+    /// stains the body accent (WardenModel.ApplyEquipmentTint) and an
+    /// equipped WEAPON replaces the class-default weapon mesh (loot slice 3).</summary>
     private void ApplyEquipmentLook()
     {
         var best = ProgressionSession.EquippedItem(ItemGenerator.EquipSlot.Body);
         _model?.ApplyEquipmentTint(best);
+        _model?.ApplyEquippedWeapon(ProgressionSession.EquippedItem(ItemGenerator.EquipSlot.Weapon));
         string summary = ProgressionSession.AffixSummary();
         if (summary.Length > 0)
             GD.Print($"EQUIPMENT ACTIVE: {summary} (max hp {MaxHp}, dmg x{ProgressionSession.DerivedDamageMult:0.00}, " +
@@ -487,6 +489,8 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         ["gear_max_hp"] = ProgressionSession.DerivedMaxHp,
         ["gear_damage_mult"] = ProgressionSession.DerivedDamageMult,
         ["gear_ward"] = ProgressionSession.DerivedWard,
+        ["gear_haste"] = ProgressionSession.DerivedHaste,
+        ["weapon_equipped"] = ProgressionSession.EquippedItem(ItemGenerator.EquipSlot.Weapon) is not null,
         ["bag_count"] = ProgressionSession.Loot.Count,
         ["sprinting"] = IsSprinting,
         ["dodging"] = IsDodging,

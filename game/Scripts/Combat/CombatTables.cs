@@ -84,4 +84,12 @@ public static class CombatTables
 
     /// <summary>Sane cap for the stealth + warcry stack (anti-cheat).</summary>
     public const float MaxTotalMultiplier = 1.75f;
+
+    // --- Haste affix (BALANCE.md: gear haste; loot slice 3, Vision 8) ------
+    // Equipped haste affixes speed the SERVER-side attack interval floor: the
+    // MinInterval of every chain attack shrinks by HastePerPoint seconds per
+    // point (the client swing cadence is untouched — the server's cooldown
+    // check just admits requests sooner). Sane-capped like every buff.
+    public const double HastePerPoint = 0.01;        // seconds off MinInterval
+    public const float HasteCapMultiplier = 0.5f;    // never faster than half speed
 }

@@ -125,7 +125,8 @@ AND the full session bag as gear_json (loot slice 2).
 | power           | +1% damage each  | DerivedDamageMult = 1 + 0.01*power           |
 | ward            | +1 absorb each   | gear ward pool, server-owned, no expiry;     |
 |                 |                  | replaced by soul ward while that is active   |
-| haste           | banked (no effect)| recorded, unused until a consumer lands     |
+| haste           | -0.01 s MinInterval each (server-side attack cadence floor; capped at half speed, i.e. haste_mult = max(0.5, 1 - 0.01*haste)); client swing cadence unchanged — the server cooldown check admits requests sooner; session-14 evidence: 6 haste = dagger MinInterval 0.18 -> 0.12 s, burst accepted at 0.12-0.13 s spacing |
+| weapon_slot     | Blade/Dagger/Staff -> Weapon | loot weapon attaches to the hand socket (rarity-stained steel), class-default weapon hidden while carried, restored on unequip |
 | gear_ward_gate  | stacks w/ kit    | gear pool restores after kit ward expires    |
 
 | date       | check                         | result                                  |
