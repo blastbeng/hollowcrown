@@ -1,6 +1,6 @@
 [gd_resource type="ShaderMaterial" format=3]
 
-[ext_resource type="Shader" path="res://Shaders/EA_Skybox.gdshader" id="1_shader"]
+[ext_resource type="Shader" path="res://assets/models/cemetery/Shaders/EA_Skybox.gdshader" id="1_shader"]
 
 [resource]
 resource_name = "EA_Skybox_Moonlit"

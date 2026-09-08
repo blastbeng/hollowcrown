@@ -71,7 +71,7 @@
 [ext_resource type="PackedScene" path="res://Prefabs/Environment/EA03_Environment_Moss_03_PRE.prefab.scn" id="69"]
 [ext_resource type="PackedScene" path="res://Prefabs/Environment/EA03_Environment_Mud_05a_PRE.prefab.scn" id="70"]
 [ext_resource type="PackedScene" path="res://Prefabs/Environment/EA_Environment_Nature_Tree_3b_PRE.prefab.scn" id="71"]
-[ext_resource type="Material" path="res://Materials/EA_Skybox_Dusk.tres" id="sky_mat"]
+[ext_resource type="Material" path="res://assets/models/cemetery/Materials/EA_Skybox_Dusk.tres" id="sky_mat"]
 
 [sub_resource type="Sky" id="sky"]
 sky_material = ExtResource("sky_mat")

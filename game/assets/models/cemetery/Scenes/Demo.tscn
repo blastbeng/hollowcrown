@@ -65,15 +65,15 @@
 [ext_resource type="PackedScene" path="res://Prefabs/EA_Environment_Nature_Grass_1b_PRE.prefab.scn" id="63"]
 [ext_resource type="PackedScene" path="res://Prefabs/Environment/EA03_Environment_Mud_05a_PRE.prefab.scn" id="64"]
 [ext_resource type="ArrayMesh" path="res://Meshes/EA_Terrain.res" id="terrain_mesh"]
-[ext_resource type="Material" path="res://Materials/EA_Terrain.tres" id="terrain_mat"]
+[ext_resource type="Material" path="res://assets/models/cemetery/Materials/EA_Terrain.tres" id="terrain_mat"]
 [ext_resource type="MultiMesh" path="res://Meshes/EA_GrassField.res" id="grass_mm"]
-[ext_resource type="Material" path="res://Materials/EA_Grass_Dead.tres" id="grass_mat"]
-[ext_resource type="Material" path="res://Materials/EA_Skybox_Moonlit.tres" id="sky_mat"]
-[ext_resource type="Material" path="res://Materials/EA_FogVolume.tres" id="fog_vol_mat"]
+[ext_resource type="Material" path="res://assets/models/cemetery/Materials/EA_Grass_Dead.tres" id="grass_mat"]
+[ext_resource type="Material" path="res://assets/models/cemetery/Materials/EA_Skybox_Moonlit.tres" id="sky_mat"]
+[ext_resource type="Material" path="res://assets/models/cemetery/Materials/EA_FogVolume.tres" id="fog_vol_mat"]
 
-[ext_resource type="Material" path="res://Materials/EA_Flame.tres" id="flame_mat"]
+[ext_resource type="Material" path="res://assets/models/cemetery/Materials/EA_Flame.tres" id="flame_mat"]
 
-[ext_resource type="Material" path="res://Materials/EA_Candle.tres" id="candle_mat"]
+[ext_resource type="Material" path="res://assets/models/cemetery/Materials/EA_Candle.tres" id="candle_mat"]
 
 [sub_resource type="CylinderMesh" id="candle_mesh"]
 top_radius = 0.032

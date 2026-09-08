@@ -1,8 +1,8 @@
 [gd_resource type="ShaderMaterial" format=3]
 
-[ext_resource type="Shader" path="res://Shaders/EA_GrassWind.gdshader" id="1_shader"]
-[ext_resource type="Texture2D" path="res://Textures/GRASS_DIFF.tga" id="2_diff"]
-[ext_resource type="Texture2D" path="res://Textures/GRASS_NMAP.tga" id="3_nmap"]
+[ext_resource type="Shader" path="res://assets/models/cemetery/Shaders/EA_GrassWind.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/models/cemetery/Textures/GRASS_DIFF.tga" id="2_diff"]
+[ext_resource type="Texture2D" path="res://assets/models/cemetery/Textures/GRASS_NMAP.tga" id="3_nmap"]
 
 [resource]
 resource_name = "EA_Grass_Dead"
