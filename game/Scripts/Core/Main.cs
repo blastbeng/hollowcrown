@@ -140,10 +140,20 @@ public partial class Main : Node3D
         // is armed so the handshake reports the declared gear stats.
         string envGear = OS.GetEnvironment("HC_GEAR");
         if (envGear.Length > 0)
-            ProgressionSession.Select(
-                CombatAuthority.PendingCharacterId > 0 ? (int)CombatAuthority.PendingCharacterId : 0,
-                "ProbeWin2", PlayerClassInfo.Id(PlayerController.PendingClass),
-                0, envGear, -1);
+        {
+            try
+            {
+                ProgressionSession.Select(
+                    CombatAuthority.PendingCharacterId > 0 ? (int)CombatAuthority.PendingCharacterId : 0,
+                    "ProbeWin2", PlayerClassInfo.Id(PlayerController.PendingClass),
+                    0, envGear, -1);
+                GD.Print($"HC_GEAR SESSION ARMED — char={CombatAuthority.PendingCharacterId} gear_len={envGear.Length}");
+            }
+            catch (Exception e)
+            {
+                GD.PrintErr($"HC_GEAR SESSION FAILED: {e.Message}");
+            }
+        }
 
         if (botMode)
         {
