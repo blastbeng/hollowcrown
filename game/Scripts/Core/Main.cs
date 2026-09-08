@@ -149,7 +149,7 @@ public partial class Main : Node3D
                     0, envGear, -1);
                 GD.Print($"HC_GEAR SESSION ARMED — char={CombatAuthority.PendingCharacterId} gear_len={envGear.Length}");
             }
-            catch (Exception e)
+            catch (System.Exception e)
             {
                 GD.PrintErr($"HC_GEAR SESSION FAILED: {e.Message}");
             }
