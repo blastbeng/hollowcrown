@@ -134,6 +134,16 @@ public partial class Main : Node3D
         string envChar = OS.GetEnvironment("HC_CHARACTER");
         if (envChar.Length > 0 && long.TryParse(envChar, out long envCharId))
             CombatAuthority.PendingCharacterId = envCharId;
+        // HC_GEAR mirrors the character-select gear load for automated playtester
+        // joins (JSON array of ItemGenerator.ToJson entries — the central
+        // gear_json format). remote_test.sh exports it at launch; the session
+        // is armed so the handshake reports the declared gear stats.
+        string envGear = OS.GetEnvironment("HC_GEAR");
+        if (envGear.Length > 0)
+            ProgressionSession.Select(
+                CombatAuthority.PendingCharacterId > 0 ? (int)CombatAuthority.PendingCharacterId : 0,
+                "ProbeWin2", PlayerClassInfo.Id(PlayerController.PendingClass),
+                0, envGear, -1);
 
         if (botMode)
         {

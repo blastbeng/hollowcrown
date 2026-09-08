@@ -18,7 +18,7 @@ RESTART=0
 # Optional playtester env (HC_CLASS/HC_BOT/HC_JOIN) must cross the SSH hop:
 # build a safe remote export string from whatever is set locally.
 HC_EXPORTS=""
-for V in HC_CLASS HC_BOT HC_JOIN HC_CHARACTER; do
+for V in HC_CLASS HC_BOT HC_JOIN HC_CHARACTER HC_GEAR; do
   VAL="${!V:-}"
   [ -n "$VAL" ] && HC_EXPORTS="$HC_EXPORTS export $V='$VAL';"
 done
