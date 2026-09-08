@@ -190,7 +190,7 @@ public partial class CharacterSelect : Control
     /// opens the server browser.</summary>
     private void Pick(CharacterDto c)
     {
-        GD.Print($"PICK CALLED: {c.Name} (id={c.Id})");
+
         PlayerController.PendingClass = PlayerClassInfo.FromId(c.ClassId);
         CombatAuthority.PendingClass = c.ClassId;
         // MMR (Vision 8): the handshake must carry WHO is playing (the match
