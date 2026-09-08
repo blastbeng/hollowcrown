@@ -43,22 +43,24 @@ public partial class ArenaTest : Node3D
         // via LIGHT0_DIRECTION (sun_follows_light = true).
         var skyMat = new ShaderMaterial { Shader = GD.Load<Shader>(
             "res://assets/models/cemetery/Shaders/EA_Skybox.gdshader") };
-        skyMat.SetShaderParameter("zenith_color", new Color(0.07f, 0.06f, 0.22f));
-        skyMat.SetShaderParameter("horizon_color", new Color(0.46f, 0.3f, 0.4f));
+        // Cold-ash dusk (Vision palette): deep blue-violet zenith, muted plum horizon —
+        // the pack's warm preset washed the whole arena amber and fought the cold steel/ash.
+        skyMat.SetShaderParameter("zenith_color", new Color(0.05f, 0.055f, 0.13f));
+        skyMat.SetShaderParameter("horizon_color", new Color(0.30f, 0.24f, 0.33f));
         skyMat.SetShaderParameter("ground_color", new Color(0.17f, 0.17f, 0.22f));
         skyMat.SetShaderParameter("horizon_sharpness", 3.6f);
         skyMat.SetShaderParameter("horizon_offset", 0.05f);
         skyMat.SetShaderParameter("sun_follows_light", true);
         skyMat.SetShaderParameter("sun_direction_manual", new Vector3(-0.5859f, 0.723f, 0.3661f));
-        skyMat.SetShaderParameter("sun_color", new Color(1f, 0.88f, 0.7f));
-        skyMat.SetShaderParameter("sun_glow_color", new Color(0.85f, 0.6f, 0.45f));
+        skyMat.SetShaderParameter("sun_color", new Color(0.95f, 0.82f, 0.72f));
+        skyMat.SetShaderParameter("sun_glow_color", new Color(0.62f, 0.55f, 0.68f));
         skyMat.SetShaderParameter("sun_size", 0.012f);
         skyMat.SetShaderParameter("sun_glow_size", 0.4f);
         skyMat.SetShaderParameter("sun_glow_falloff", 7f);
-        skyMat.SetShaderParameter("sky_gradient_color", new Color(1f, 0.44f, 0.14f));
+        skyMat.SetShaderParameter("sky_gradient_color", new Color(0.55f, 0.42f, 0.55f));
         skyMat.SetShaderParameter("sky_gradient_angle", 235f);
         skyMat.SetShaderParameter("sky_gradient_spread", 0.72f);
-        skyMat.SetShaderParameter("sky_gradient_strength", 0.26f);
+        skyMat.SetShaderParameter("sky_gradient_strength", 0.16f);
         skyMat.SetShaderParameter("atmosphere_color", new Color(0.42f, 0.36f, 0.7f));
         skyMat.SetShaderParameter("atmosphere_strength", 0.6f);
         skyMat.SetShaderParameter("atmosphere_falloff", 4.2f);
@@ -93,7 +95,7 @@ public partial class ArenaTest : Node3D
             TonemapMode = Godot.Environment.ToneMapper.Aces,
             TonemapExposure = 1.15f,
             FogEnabled = true,
-            FogLightColor = Color.FromHtml("4a3040"),   // warm dark plum horizon
+            FogLightColor = Color.FromHtml("322a3a"),   // cold plum-ash horizon
             FogDensity = 0.003f,
             VolumetricFogEnabled = true,
             VolumetricFogDensity = 0.006f,
@@ -107,7 +109,7 @@ public partial class ArenaTest : Node3D
         // glow hugs the horizon. The shader reads LIGHT0_DIRECTION directly.
         var sun = new DirectionalLight3D
         {
-            LightColor = Color.FromHtml("c9a06a"),
+            LightColor = Color.FromHtml("b0a4c0"),       // pale cold dusk sun
             LightEnergy = 1.5f,
             ShadowEnabled = true,
         };
@@ -492,11 +494,12 @@ public partial class ArenaTest : Node3D
     private void AddGraveProp(string shortName, float x, float z, float yawDeg,
         float tiltDeg, float scale, bool collide, RandomNumberGenerator rng)
     {
+        // The dead tree mesh breaks the Grave_* naming convention (no _01a suffix).
         string path = $"res://assets/models/cemetery/Meshes/EA_{shortName switch
         {
             "Tree_3b" => "Environment_Nature_Tree_3b",
             _ => $"Grave_{shortName}",
-        }}_01a.glb";
+        }}{(shortName == "Tree_3b" ? "" : "_01a")}.glb";
 
         // Graceful path: the remote editor imports the glbs on next rescan;
         // until then skip the prop instead of killing the arena build.
