@@ -273,6 +273,37 @@ tolerates both forms. (69) The docker-mcp chroma stack: chroma MCP needs
 MCP_GATEWAY_DOCKER_BIND_ALLOW_WRITABLE_PATHS="...:/..." (COLON-separated Go
 path list); the default embedding fn downloads a 79 MB ONNX model on first
 use — persist /root/.cache via a volume or the download progress corrupts MCP
+framing. (70) A second godot-mcp client from the same AiderDesk holds the
+single-client bridge slot — kill the holder pid (the one owning ESTAB 6550).
+SESSION 18 (2026-09-08) ASSET SOURCING + integration: new graveyard dressing +
+dusk sky. (a) EmacEArt Low Poly Cemetery Grave Pack (Godot store asset,
+EmacEArt license commercial-OK, no credit required) downloaded via
+godot-store-mcp store_download_asset into game/assets/models/cemetery/ (12
+glb meshes, stylized sky/terrain/grass/fog shaders, tuned Dusk/Moonlit sky
+presets; cull: repo ships ONLY glb+shaders+textures+materials — fbx
+duplicates + unity-extracted meshes dropped in 5ac00d7). (b) ArenaTest
+rewritten: BuildEnvironment loads EA_Skybox.gdshader via a ShaderMaterial
+(ShaderMaterial.SetShaderParameter snake_case names) instead of the flat
+ProceduralSky; the pack's Dusk preset values were COPIED INTO C# then RETUNED
+cold-ash (the pack's warm preset washed the arena amber — see 475bedf);
+DirectionalLight3D #b0a4c0 @1.5 rot(-28,30,0) feeds the sky's sun via
+LIGHT0_DIRECTION (sun_follows_light). BuildGraveyard(): 35 props (slabs,
+obelisks, pyramids, railings, archway gate on the east breach, stone
+lanterns, mud clutter, dead tree) scattered with seeded RNG 1337 at ring
+radius 10-20, spawn lanes + center r<4 kept clear; cover props get
+StaticBody3D+BoxShape3D fitted to the SCALED tree AABB (verified: player
+pushed into a slab stops at the collision face); graceful skip +
+PushWarning when a glb is unimported. GOTCHAS: pack .tres/.tscn files ship
+with res://Shaders|Textures|Materials paths from the pack's own project root
+— rewrite to res://assets/models/cemetery/... ; glb imports cache those
+paths, so a path fix needs game/.godot/imported wiped + editor restart;
+Environment_Nature_* meshes have no _01a suffix (Grave_* do — path builder
+handles both). (c) PolyHaven belfast_sunset_puresky HDRI (CC0, via Blender
+MCP download_polyhaven_asset + a chunked-base64 extraction through the MCP
+channel because Blender's container mount does not write through to the
+host) stored unused at game/assets/hdris/ for future lighting experiments.
+ATTRIBUTION.md updated (db59fa5). Evidence screenshots: graveyard + cooled
+dusk sky render correctly on the remote; 27 grave colliders live.
 stdio framing ('invalid character S'); collection naming:
 aiderdesk_<project>_memory. (70) A parallel godot-mcp client from the same
 AiderDesk can hold the bridge slot after an MCP reconnect — kill the holder
