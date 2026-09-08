@@ -125,16 +125,30 @@ public static class ItemGenerator
             string name = nameEl.GetString() ?? "";
             if (name.Length == 0)
                 return null;
-            string rarityStr = root.TryGetProperty("rarity", out var rEl)
-                ? rEl.GetString() ?? "" : "";
-            Rarity rarity = rarityStr switch
+            // Rarity tolerates both the ToJson string form ("uncommon") and a
+            // numeric index (legacy/handwritten rows — a JsonValueKind mismatch
+            // on GetString() used to kill the whole load with an exception).
+            Rarity rarity = Rarity.Common;
+            if (root.TryGetProperty("rarity", out var rEl))
             {
-                "uncommon" => Rarity.Uncommon,
-                "rare" => Rarity.Rare,
-                "epic" => Rarity.Epic,
-                "MYTHIC" or "mythic" => Rarity.Mythic,
-                _ => Rarity.Common,
-            };
+                if (rEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    rarity = (rEl.GetString() ?? "") switch
+                    {
+                        "uncommon" => Rarity.Uncommon,
+                        "rare" => Rarity.Rare,
+                        "epic" => Rarity.Epic,
+                        "MYTHIC" or "mythic" => Rarity.Mythic,
+                        _ => Rarity.Common,
+                    };
+                }
+                else if (rEl.ValueKind == System.Text.Json.JsonValueKind.Number &&
+                         rEl.TryGetInt32(out int rIdx) &&
+                         rIdx >= 0 && rIdx < (int)Rarity.Mythic)
+                {
+                    rarity = (Rarity)rIdx;
+                }
+            }
             int ilvl = root.TryGetProperty("ilvl", out var lvlEl) && lvlEl.TryGetInt32(out int l)
                 ? l : 1;
             var affixes = new List<Affix>();
@@ -143,7 +157,8 @@ public static class ItemGenerator
             {
                 foreach (var el in affArr.EnumerateArray())
                 {
-                    string s = el.GetString() ?? "";
+                    string s = el.ValueKind == System.Text.Json.JsonValueKind.String
+                        ? el.GetString() ?? "" : "";
                     int colon = s.IndexOf(':');
                     if (colon > 0 && int.TryParse(s[(colon + 1)..], out int v))
                         affixes.Add(new Affix(s[..colon], v));
