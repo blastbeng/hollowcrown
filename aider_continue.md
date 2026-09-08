@@ -188,13 +188,7 @@ compile check (remote or local):
   output is the main cause of remote pull failures).
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
-1. Remote-avatar combat polish (fold of old 7 + 13 leftovers): attack-cast
-   relay (puppets can't show remote swings/casts), root/stealth visuals on
-   remote puppets (RemoteAvatar.OnRooted is a no-op stub), nameplate HP bars
-   over remote avatars, REMOTE-PEER GEAR GAP (vitality/ward/haste derive from
-   the LOCAL session only — fix = handshake gear report signed by the match
-   server or central-sourced gear at spawn approval).
-2. Skirmish mode (3v3) + team spawns/score.
+1. Skirmish mode (3v3) + team spawns/score.
 3. Open world zone: village chunks, shrines, roaming elites, minimap.
 4. Matchmaking quick-play flow via central.
 5. Atmosphere pass 2: ambience audio, fog drift, fireflies.
@@ -210,6 +204,80 @@ compile check (remote or local):
 9. Arena polish leftovers (small): second banner palette on the far ring
    side, cobwebs under the arch lintels, Prop_Crate/MetalFence kit pieces
    placed as spawn-side dressing.
+
+SESSION 17 NOTE (2026-09-08) — REMOTE-AVATAR COMBAT POLISH DONE, all four
+sub-features verified end-to-end (was NEXT TASKS 1). CAST RELAY: the authority
+broadcasts SendCast -> CastRpc(peerId, attackId, facing) [Authority,
+CallLocal=true, Reliable] fired in ValidateAndApply right after _lastHitAt is
+set (validation-passed point, NOT gated on damage/victim — a fully warded hit
+still reads as a cast); CastRpc routes ONLY to RemoteAvatar.PlayRemoteCast
+(the owning client's PlayerController is skipped — no double-play; bots
+ignored). PlayRemoteCast snaps the puppet's _targetYaw (RADIANS — the position
+relay stores radians), plays the class attack clip (ChainMid/DaggerMid -> 1,
+finishers -> 2, else 0) and flashes the ground telegraph from CombatTables.Get
+(Sector for arcs, Line for spear/drain), GlobalRotation zeroed (the mesh
+geometry is baked in world space — the body yaw must not rotate it twice).
+STATUS VISUALS: RemoteAvatar.OnRooted draws a flat arcane disc
+(GroundShapes.Sector(1.1, 360), y 0.02) ticked by _rootTimer; OnWard mirrors
+the RevenantKit ward disc; OnStunned a bone #d8cfc0 flash ring capped 0.5 s;
+OnKilled clears every status timer/disc (a root timer would reappear
+mid-respawn). PlayerController.OnRooted gained the same local disc
+(SyncRootDisc, cleared on death). NAMEPLATE HP BARS: a 1.2 x 0.08 m BoxMesh
+slab at y 2.55 above the nameplate — dark #121014 back + blood-red fill,
+fill X-scale = hp fraction with center-pivot compensation (left edge pinned);
+the bar root takes the camera-facing GLOBAL yaw each frame (meshes cannot
+billboard and local rotation would inherit the body's cast yaw); updated from
+OnHitApplied/OnHealed/OnRespawned + SetMaxHp (SpawnPlayerRpc grew a maxHp
+parameter — the server passes MaxHpOfPeer, late-join catch-up passes each
+peer's, and avatar.SetMaxHp runs AFTER AddChild so the bar exists).
+REMOTE-PEER GEAR GAP CLOSED: CombatAuthority statics PendingGear{Vitality,
+Power,Haste,Ward}; SendHandshake (client, !IsAuthorityMode) computes them from
+ProgressionSession.StatTotal (guard CharacterId > 0) covering every join path;
+HandshakeRpc is now 7-arg (adds the 4 ints) and PeerInfo stores them; instance
+helpers MaxHpOfPeer/GearHasteOfPeer/GearWardOfPeer serve server truth (_maxHp
+dict / PeerInfo declared / local-session fallback for peer 1 + bots 500-999);
+the static MaxHpOf is REMOVED (PeerTargetRecord.MaxHp = _auth.MaxHpOfPeer);
+the haste branch, peerGearWard, ValidatePickup and the ward-expiry restore all
+use the helpers; RegisterPlayer registers DerivedMaxHp (was hardcoded 100).
+EVIDENCE (dedicated server 7777 + playtester warden client + headless
+nightblade client B): playtester handshake line "gear vit=0 power=0 haste=2
+ward=10" -> DS approved; hit on the remote nightblade puppet = server
+"attack=1 dmg=20 hp=80/100" -> client target frame 80/100 + avatar Hp=80 +
+HpFill scale exactly (0.8, 1, 1); clientB logged "REMOTE AVATAR CAST —
+Warden#273223126 attack=1 (relay)" (the puppet replayed the swing);
+grave grasp (attackId 9) -> "REMOTE AVATAR ROOTED 1,0s" + root disc
+visible=true at the avatar's feet (verified frozen mid-timer); two ChainLight
+hits admitted back-to-back on the REMOTE attacker — the haste gate
+(0.30 - 0.02*2 = 0.28) accepted the immediate repeat that the base gate
+rejects (session 15 negative control). Menu/character-select screenshots
+judged vs Section 6 (MMR tier labels on cards, palette-correct UI).
+COMMIT e5389f8 (feature) + 07d41da (HC_GEAR env mirror for automated joins:
+remote_test.sh exports HC_CLASS/HC_CHARACTER/HC_JOIN/HC_GEAR across the SSH
+hop; Main arms the session from the central gear_json format) + 8af9599
+(FromJson tolerates NUMERIC rarity indexes and non-string affix entries — a
+handwritten gear row threw inside FromJson's GetString() and killed the whole
+gear load; this was ALSO the silent Pick() death: the exception propagated out
+of ProgressionSession.Select before the status line) + b106366 (revert of the
+temporary /characters JSON probe — deserialization was never the problem).
+GOTCHAS (session 17): (66) pressed.emit() on the character-card Select button
+died silently when the card was rebuilt between find and emit (stale closure
+on a QueueFree'd control) — re-verify after a visibility-toggle refresh and
+emit only on is_queued_for_deletion()==false matches; a GD.Print at the top of
+the suspect method is the fastest disambiguator. (67) LeaveRealm PUTs the
+session's SerializeGear() — re-seed central gear AFTER the last LeaveRealm or
+the test loadout is wiped. (68) ItemGenerator.FromJson: GetString() on a
+Number rarity threw InvalidOperationException (only JsonException is caught)
+— any handcrafted/legacy row with numeric fields killed the pick; now
+tolerates both forms. (69) The docker-mcp chroma stack: chroma MCP needs
+"--ssl" "false" (chromadb HttpClient attempts TLS otherwise) and
+MCP_GATEWAY_DOCKER_BIND_ALLOW_WRITABLE_PATHS="...:/..." (COLON-separated Go
+path list); the default embedding fn downloads a 79 MB ONNX model on first
+use — persist /root/.cache via a volume or the download progress corrupts MCP
+stdio framing ('invalid character S'); collection naming:
+aiderdesk_<project>_memory. (70) A parallel godot-mcp client from the same
+AiderDesk can hold the bridge slot after an MCP reconnect — kill the holder
+pid (ESTAB 6550) or let it drop; the playtester MCP then reconnects on retry.
+NEXT: skirmish 3v3 (NEXT TASKS 1).
 
 SESSION 16 NOTE (2026-09-07) — MMR/ELO + LEADERBOARD + TIERS + MATCH-SERVER
 TOKENS DONE, all verified end-to-end (Vision 8/4; was NEXT TASKS 1).
