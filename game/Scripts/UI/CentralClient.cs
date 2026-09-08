@@ -82,9 +82,15 @@ public partial class CentralClient : Node
         try
         {
             using var resp = await Authed(HttpMethod.Get, "characters");
-            return resp.IsSuccessStatusCode
-                ? await resp.Content.ReadFromJsonAsync<List<CharacterDto>>(JsonOpts)
-                : null;
+            if (!resp.IsSuccessStatusCode)
+                return null;
+            string raw = await resp.Content.ReadAsStringAsync();
+            GD.Print($"CENTRAL CHARACTERS RAW: {raw[..Math.Min(raw.Length, 400)]}");
+            var list = JsonSerializer.Deserialize<List<CharacterDto>>(raw, JsonOpts);
+            if (list is not null)
+                foreach (var c in list)
+                    GD.Print($"CENTRAL PARSED: id={c.Id} gear_len={c.GearJson.Length}");
+            return list;
         }
         catch (Exception)
         {
