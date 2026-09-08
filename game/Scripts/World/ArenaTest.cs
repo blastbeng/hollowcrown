@@ -26,50 +26,108 @@ public partial class ArenaTest : Node3D
         BuildBrazier(3.5f, 2.2f, 3.5f);     // obelisk side
         BuildRubble();
         BuildBannersAndDetails();
+        BuildGraveyard();
         BuildDummy();
         BuildPlayer();
         BuildCameraAndHelpers();
-        GD.Print("ARENA TEST READY — iso camera rig, cursor aim reticle, occlusion fade, combat live, gothic arches + banners");
+        GD.Print("ARENA TEST READY — iso camera rig, cursor aim reticle, occlusion fade, combat live, gothic arches + banners, dusk sky + graveyard props");
     }
 
     private void BuildEnvironment()
     {
-        var sky = new ProceduralSkyMaterial
-        {
-            SkyTopColor = Color.FromHtml("23262e"),
-            SkyHorizonColor = Color.FromHtml("191a20"),
-            GroundBottomColor = Color.FromHtml("0e0f13"),
-            GroundHorizonColor = Color.FromHtml("15161c"),
-        };
+        // --- DUSK SKY (EmacEArt Cemetery Pack, graveyard polish) ---
+        // Stylized procedural sky replaces the flat ProceduralSkyMaterial.
+        // Parameters are the exact set from Materials/EA_Skybox_Dusk.tres
+        // (hardcoded here so the build-in-code architecture stays intact).
+        // The shader syncs its sun disc/glow to this node's DirectionalLight3D
+        // via LIGHT0_DIRECTION (sun_follows_light = true).
+        var skyMat = new ShaderMaterial { Shader = GD.Load<Shader>(
+            "res://assets/models/cemetery/Shaders/EA_Skybox.gdshader") };
+        skyMat.SetShaderParameter("zenith_color", new Color(0.07f, 0.06f, 0.22f));
+        skyMat.SetShaderParameter("horizon_color", new Color(0.46f, 0.3f, 0.4f));
+        skyMat.SetShaderParameter("ground_color", new Color(0.17f, 0.17f, 0.22f));
+        skyMat.SetShaderParameter("horizon_sharpness", 3.6f);
+        skyMat.SetShaderParameter("horizon_offset", 0.05f);
+        skyMat.SetShaderParameter("sun_follows_light", true);
+        skyMat.SetShaderParameter("sun_direction_manual", new Vector3(-0.5859f, 0.723f, 0.3661f));
+        skyMat.SetShaderParameter("sun_color", new Color(1f, 0.88f, 0.7f));
+        skyMat.SetShaderParameter("sun_glow_color", new Color(0.85f, 0.6f, 0.45f));
+        skyMat.SetShaderParameter("sun_size", 0.012f);
+        skyMat.SetShaderParameter("sun_glow_size", 0.4f);
+        skyMat.SetShaderParameter("sun_glow_falloff", 7f);
+        skyMat.SetShaderParameter("sky_gradient_color", new Color(1f, 0.44f, 0.14f));
+        skyMat.SetShaderParameter("sky_gradient_angle", 235f);
+        skyMat.SetShaderParameter("sky_gradient_spread", 0.72f);
+        skyMat.SetShaderParameter("sky_gradient_strength", 0.26f);
+        skyMat.SetShaderParameter("atmosphere_color", new Color(0.42f, 0.36f, 0.7f));
+        skyMat.SetShaderParameter("atmosphere_strength", 0.6f);
+        skyMat.SetShaderParameter("atmosphere_falloff", 4.2f);
+        skyMat.SetShaderParameter("exposure", 0.9f);
+        skyMat.SetShaderParameter("contrast", 1.02f);
+        skyMat.SetShaderParameter("saturation", 0.98f);
+        skyMat.SetShaderParameter("lift", new Color(0f, 0f, 0f));
+        skyMat.SetShaderParameter("gamma_midtones", new Color(0.5f, 0.5f, 0.5f));
+        skyMat.SetShaderParameter("gain", new Color(0.9836f, 0.9889f, 0.9624f));
+        skyMat.SetShaderParameter("clouds_enabled", true);
+        skyMat.SetShaderParameter("cloud_color", new Color(0.42f, 0.35f, 0.55f));
+        skyMat.SetShaderParameter("cloud_shadow_color", new Color(0.13f, 0.11f, 0.26f));
+        skyMat.SetShaderParameter("cloud_coverage", 0.62f);
+        skyMat.SetShaderParameter("cloud_softness", 0.32f);
+        skyMat.SetShaderParameter("cloud_bands", 4f);
+        skyMat.SetShaderParameter("cloud_density", 0.5f);
+        skyMat.SetShaderParameter("cloud_stretch", 0.36f);
+        skyMat.SetShaderParameter("cloud_swirl", 0.364f);
+        skyMat.SetShaderParameter("cloud_style", 0.276f);
+        skyMat.SetShaderParameter("cloud_scale", 4.45f);
+        skyMat.SetShaderParameter("cloud_height", 0f);
+        skyMat.SetShaderParameter("cloud_speed", 0.336f);
+
+        // Fog retuned to the dusk horizon tone; ambient now feeds from the
+        // sky itself (the shader's own color grading does the rest).
         var env = new Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Sky,
-            Sky = new Sky { SkyMaterial = sky },
-            AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            AmbientLightColor = Color.FromHtml("1a1a22"),
-            AmbientLightEnergy = 1.6f,
+            Sky = new Sky { SkyMaterial = skyMat },
+            AmbientLightSource = Godot.Environment.AmbientSource.Sky,
+            AmbientLightEnergy = 1.0f,
             TonemapMode = Godot.Environment.ToneMapper.Aces,
             TonemapExposure = 1.15f,
             FogEnabled = true,
-            FogLightColor = Color.FromHtml("0e0f13"),
-            FogDensity = 0.004f,
+            FogLightColor = Color.FromHtml("4a3040"),   // warm dark plum horizon
+            FogDensity = 0.003f,
             VolumetricFogEnabled = true,
-            VolumetricFogDensity = 0.008f,
+            VolumetricFogDensity = 0.006f,
             SsaoEnabled = true,
             GlowEnabled = true,
-            GlowIntensity = 0.5f,
+            GlowIntensity = 0.6f,
         };
         AddChild(new WorldEnvironment { Environment = env });
 
-        // Cold low-energy dusk light with long dramatic shadows (Vision 6.1/6.2).
+        // Warm amber dusk light, sun low (-28 deg elevation) so the shader's
+        // glow hugs the horizon. The shader reads LIGHT0_DIRECTION directly.
         var sun = new DirectionalLight3D
         {
-            LightColor = Color.FromHtml("9aa7c0"),
-            LightEnergy = 1.35f,
+            LightColor = Color.FromHtml("c9a06a"),
+            LightEnergy = 1.5f,
             ShadowEnabled = true,
         };
-        sun.RotationDegrees = new Vector3(-55f, 30f, 0f);
+        sun.RotationDegrees = new Vector3(-28f, 30f, 0f);
         AddChild(sun);
+
+        // --- ROLLBACK (previous flat ProceduralSky look) ---
+        // var sky = new ProceduralSkyMaterial
+        // {
+        //     SkyTopColor = Color.FromHtml("23262e"),
+        //     SkyHorizonColor = Color.FromHtml("191a20"),
+        //     GroundBottomColor = Color.FromHtml("0e0f13"),
+        //     GroundHorizonColor = Color.FromHtml("15161c"),
+        // };
+        // AmbientLightSource = Godot.Environment.AmbientSource.Color,
+        // AmbientLightColor = Color.FromHtml("1a1a22"),
+        // AmbientLightEnergy = 1.6f,
+        // FogLightColor = Color.FromHtml("0e0f13"),
+        // FogDensity = 0.004f, VolumetricFogDensity = 0.008f, GlowIntensity = 0.5f
+        // sun: LightColor "9aa7c0", LightEnergy 1.35f, RotationDegrees (-55, 30, 0)
     }
 
     /// <summary>Broken ring wall around the duel ground (Vision 6.6): 10
@@ -365,5 +423,162 @@ public partial class ArenaTest : Node3D
         var rain = AtmosphereParticles.Rain(new Vector2(38, 38));   // Vision 6.2: rain outdoors
         rain.Position = new Vector3(0, 14f, 0);
         AddChild(rain);
+    }
+
+    /// <summary>Graveyard dressing (Vision 6.6 ruined graveyard arena):
+    /// EmacEArt Low Poly Cemetery Grave Pack glbs scattered inside the ring
+    /// wall — tilted headstones for cover, an archway gate on the breach,
+    /// lanterns by the obelisk, one dead tree. Deterministic seed so the
+    /// layout is stable between runs; cover props get fitted colliders.
+    /// HDRI (belfast_sunset_puresky_1k.hdr) is deliberately NOT loaded —
+    /// the stylized sky shader replaces it; kept for lighting experiments.</summary>
+    private void BuildGraveyard()
+    {
+        var rng = new RandomNumberGenerator { Seed = 1337 };  // deterministic (Vision 6)
+
+        // (x, z, yawDeg, tiltDeg, scale) — spread around the ring at radius
+        // 10-20, clear of both spawn lanes (±5, ∓8) and the very center.
+        (float x, float z, float yaw, float tilt, float scale)[] spots =
+        {
+            (-11f, -9f, 20f, 6f, 1.1f),    // slabs NW quadrant
+            (-16f, 4f, 80f, 4f, 0.95f),
+            (-4f, 14f, 170f, 5f, 1.0f),
+            (11f, 12f, 245f, 7f, 1.15f),
+            (16f, -3f, 305f, 10f, 1.05f),
+            (3f, -13f, 15f, 8f, 1.1f),
+        };
+        foreach (var (x, z, yaw, tilt, scale) in spots)
+            AddGraveProp("Slab_Tall", x, z, yaw, tilt, scale, collide: true, rng);
+
+        // Obelisk + pyramid mix, tucked between the slabs.
+        AddGraveProp("Obelisk", -18f, 9f, 75f, 3f, 1.0f, collide: true, rng);
+        AddGraveProp("Obelisk", 19f, 8f, 250f, 4f, 0.9f, collide: true, rng);
+        AddGraveProp("Obelisk", 18f, -9f, 300f, 2f, 1.05f, collide: true, rng);
+        AddGraveProp("Pyramid", -7f, 12.5f, 150f, 2f, 1.0f, collide: false, rng);
+        AddGraveProp("Pyramid", 7f, 12f, 205f, 3f, 1.1f, collide: false, rng);
+        AddGraveProp("Pyramid", -8f, -12f, 35f, 2f, 0.95f, collide: false, rng);
+        AddGraveProp("Pyramid", 8f, -13f, 65f, 4f, 1.05f, collide: false, rng);
+
+        // Ruined wooden gate on the east breach (ring gap at i==7, x≈14).
+        AddGraveProp("Archway_Wood", 14.2f, 0f, 90f, 6f, 1.1f, collide: true, rng);
+
+        // Railing row along the NW ring stretch, slightly inside the wall.
+        for (int i = 0; i < 4; i++)
+            AddGraveProp("Railing", -13f + i * 1.9f, -12.5f - i * 0.6f, 115f + i * 3f,
+                2f, 1.0f, collide: true, rng);
+
+        // Lanterns near the center features (obelisk side); no lights yet.
+        AddGraveProp("Lantern_Stone", 7.6f, -4.4f, 210f, 1f, 1.0f, collide: false, rng);
+        AddGraveProp("Lantern_Stone", 4.6f, -7.6f, 30f, 2f, 0.95f, collide: false, rng);
+
+        // Clutter: mud stones / log pile / posts scattered low around ring.
+        AddGraveProp("Mud_Stones", -6f, 9.5f, 95f, 1f, 1.2f, collide: false, rng);
+        AddGraveProp("Mud_Stones", 12f, 8f, 160f, 1f, 1.0f, collide: false, rng);
+        AddGraveProp("Mud_Stones", 6f, -10f, 20f, 1f, 0.9f, collide: false, rng);
+        AddGraveProp("Mud_Post", -12f, 6f, 140f, 3f, 1.1f, collide: false, rng);
+        AddGraveProp("Mud_Post", 13f, 2f, 250f, 2f, 1.0f, collide: false, rng);
+        AddGraveProp("LogPile", -14.5f, 1f, 100f, 2f, 1.0f, collide: false, rng);
+
+        // One dead tree by the west wall — big cover piece near a breach.
+        AddGraveProp("Tree_3b", -19f, -6f, 60f, 2f, 1.0f, collide: true, rng);
+
+        GD.Print("GRAVEYARD: props placed (spawn lanes + center kept clear)");
+    }
+
+    /// <summary>Instantiate one cemetery glb as a scene node. Cover props get
+    /// a StaticBody3D + box collider fitted to the SCALED Aabb (offset must
+    /// mirror the mesh offset from body origin — the half-buried-wall
+    /// gotcha). Missing/unimported glbs are skipped with a warning.</summary>
+    private void AddGraveProp(string shortName, float x, float z, float yawDeg,
+        float tiltDeg, float scale, bool collide, RandomNumberGenerator rng)
+    {
+        string path = $"res://assets/models/cemetery/Meshes/EA_{shortName switch
+        {
+            "Tree_3b" => "Environment_Nature_Tree_3b",
+            _ => $"Grave_{shortName}",
+        }}_01a.glb";
+
+        // Graceful path: the remote editor imports the glbs on next rescan;
+        // until then skip the prop instead of killing the arena build.
+        if (!ResourceLoader.Exists(path))
+        {
+            GD.PushWarning($"GRAVEYARD: {path} not imported yet — prop skipped");
+            return;
+        }
+
+        Node? model;
+        try
+        {
+            model = GD.Load<PackedScene>(path).Instantiate();
+        }
+        catch (System.Exception e)
+        {
+            GD.PushWarning($"GRAVEYARD: {path} failed to load — {e.Message}");
+            return;
+        }
+        if (model is null)
+        {
+            GD.PushWarning($"GRAVEYARD: {path} instantiated null — prop skipped");
+            return;
+        }
+
+        var body = new StaticBody3D { Name = $"Grave_{shortName}_{rng.RandiRange(0, 9999)}" };
+        body.AddChild(model);
+
+        // Log the mesh Aabb once on first load so extents can be tuned
+        // against the 1.2-1.6 m slab-height target.
+        if (model is MeshInstance3D meshRoot && meshRoot.Mesh is not null)
+            GD.Print($"GRAVEYARD Aabb {shortName}: pos={meshRoot.Mesh.GetAabb().Position} " +
+                     $"size={meshRoot.Mesh.GetAabb().Size}");
+
+        if (collide)
+        {
+            var aabb = GetTreeAabb(model);
+            if (aabb.Size.Length() > 0.01f)
+            {
+                var cs = new CollisionShape3D
+                {
+                    Shape = new BoxShape3D { Size = aabb.Size * scale },
+                    Position = (aabb.Position + aabb.Size / 2f) * scale,
+                };
+                body.AddChild(cs);
+            }
+        }
+
+        body.Position = new Vector3(x, 0f, z);
+        body.RotationDegrees = new Vector3(
+            (float)rng.RandfRange(-tiltDeg, tiltDeg) * 0.35f,
+            yawDeg + (float)rng.RandfRange(-8f, 8f),
+            (float)rng.RandfRange(-tiltDeg, tiltDeg));
+        body.Scale = new Vector3(1, 1, 1) * scale;
+        AddChild(body);
+    }
+
+    /// <summary>Combined node-local Aabb of every MeshInstance3D under the
+    /// instantiated glb (the glb root is a Node3D, not the mesh itself).</summary>
+    private static Aabb GetTreeAabb(Node root)
+    {
+        var bounds = new Aabb();
+        bool first = true;
+        Collect(root);
+        return bounds;
+
+        void Collect(Node node)
+        {
+            if (node is MeshInstance3D mi && mi.Mesh is not null)
+            {
+                var local = mi.Mesh.GetAabb();
+                // Mesh-local -> node-local via the mesh node transform.
+                var box = new Aabb(mi.Transform * local.Position, Vector3.Zero)
+                    .Expand(mi.Transform * local.End);
+                if (first)
+                    bounds = box;
+                else
+                    bounds = bounds.Merge(box);
+                first = false;
+            }
+            foreach (var child in node.GetChildren())
+                Collect(child);
+        }
     }
 }

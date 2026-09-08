@@ -1,0 +1,404 @@
+[gd_scene load_steps=74 format=3]
+
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Comp_01_PRE.prefab.scn" id="1"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Full_01a_PRE.prefab.scn" id="2"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Full_01b_PRE.prefab.scn" id="3"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Full_01c_PRE.prefab.scn" id="4"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Full_01d_PRE.prefab.scn" id="5"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Full_01e_PRE.prefab.scn" id="6"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Half_01a_PRE.prefab.scn" id="7"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Half_01b_PRE.prefab.scn" id="8"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Half_01c_PRE.prefab.scn" id="9"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Broken/EA_Grave_Broken_Half_01d_PRE.prefab.scn" id="10"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_01a_PRE.prefab.scn" id="11"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_Arch_01a_PRE.prefab.scn" id="12"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_Bank_01a_PRE.prefab.scn" id="13"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_Book_01a_PRE.prefab.scn" id="14"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_Columbarium_01a_PRE.prefab.scn" id="15"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_Monu_01a_PRE.prefab.scn" id="16"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_RockStack_01a_PRE.prefab.scn" id="17"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_Rock_01a_PRE.prefab.scn" id="18"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_Tomb_01a_PRE.prefab.scn" id="19"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Distinctive Memorials/EA_Grave_WoodForm_01a_PRE.prefab.scn" id="20"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Archway_Wood_01a_PRE.prefab.scn" id="21"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Lantern_Stone_01a_PRE.prefab.scn" id="22"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_LogPile_01a_PRE.prefab.scn" id="23"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Mud_Flat_01a_PRE.prefab.scn" id="24"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Mud_Plank_01a_PRE.prefab.scn" id="25"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Mud_Post_01a_PRE.prefab.scn" id="26"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Mud_Stones_01a_PRE.prefab.scn" id="27"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Obelisk_01a_PRE.prefab.scn" id="28"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Pyramid_01a_PRE.prefab.scn" id="29"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Railing_01a_PRE.prefab.scn" id="30"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Halloween/EA_Grave_Slab_Tall_01a_PRE.prefab.scn" id="31"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Modern/EA_Grave_Modern_Full_01a_PRE.prefab.scn" id="32"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Modern/EA_Grave_Modern_Full_01b_PRE.prefab.scn" id="33"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Modern/EA_Grave_Modern_Full_01c_PRE.prefab.scn" id="34"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Modern/EA_Grave_Modern_Full_01d_PRE.prefab.scn" id="35"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Modern/EA_Grave_Modern_Mini_01a_PRE.prefab.scn" id="36"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Modern/EA_Grave_Modern_Mini_01b_PRE.prefab.scn" id="37"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Modern/EA_Grave_Modern_Mini_01c_PRE.prefab.scn" id="38"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Modern/EA_Grave_Modern_Mini_01d_PRE.prefab.scn" id="39"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_01a_PRE.prefab.scn" id="40"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_01b_PRE.prefab.scn" id="41"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_01c_PRE.prefab.scn" id="42"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_01d_PRE.prefab.scn" id="43"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_01e_PRE.prefab.scn" id="44"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_01f_PRE.prefab.scn" id="45"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_02a_PRE.prefab.scn" id="46"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_02b_PRE.prefab.scn" id="47"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_02c_PRE.prefab.scn" id="48"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_02d_PRE.prefab.scn" id="49"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_03a_PRE.prefab.scn" id="50"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_03b_PRE.prefab.scn" id="51"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_03c_PRE.prefab.scn" id="52"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Sand/EA_Grave_Sand_Mini_03d_PRE.prefab.scn" id="53"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_01a_PRE.prefab.scn" id="54"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_01b_PRE.prefab.scn" id="55"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_01c_PRE.prefab.scn" id="56"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_01d_PRE.prefab.scn" id="57"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_01e_PRE.prefab.scn" id="58"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_02a_PRE.prefab.scn" id="59"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_02b_PRE.prefab.scn" id="60"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_02c_PRE.prefab.scn" id="61"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Stone/EA_Grave_Stone_Mini_02d_PRE.prefab.scn" id="62"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Wooden/EA_Grave_Wooden_Mini_01a_PRE.prefab.scn" id="63"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Wooden/EA_Grave_Wooden_Mini_01b_PRE.prefab.scn" id="64"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Wooden/EA_Grave_Wooden_Mini_01c_PRE.prefab.scn" id="65"]
+[ext_resource type="PackedScene" path="res://Prefabs/Grave/Wooden/EA_Grave_Wooden_Mini_01d_PRE.prefab.scn" id="66"]
+[ext_resource type="PackedScene" path="res://Prefabs/EA_Environment_Nature_Grass_1b_PRE.prefab.scn" id="67"]
+[ext_resource type="PackedScene" path="res://Prefabs/EA_Environment_Nature_Grass_1c_PRE.prefab.scn" id="68"]
+[ext_resource type="PackedScene" path="res://Prefabs/Environment/EA03_Environment_Moss_03_PRE.prefab.scn" id="69"]
+[ext_resource type="PackedScene" path="res://Prefabs/Environment/EA03_Environment_Mud_05a_PRE.prefab.scn" id="70"]
+[ext_resource type="PackedScene" path="res://Prefabs/Environment/EA_Environment_Nature_Tree_3b_PRE.prefab.scn" id="71"]
+[ext_resource type="Material" path="res://Materials/EA_Skybox_Dusk.tres" id="sky_mat"]
+
+[sub_resource type="Sky" id="sky"]
+sky_material = ExtResource("sky_mat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 2
+ambient_light_color = Color(0.32, 0.3, 0.52, 1)
+ambient_light_sky_contribution = 0.0
+ambient_light_energy = 0.72
+reflected_light_source = 2
+tonemap_mode = 3
+tonemap_exposure = 1.02
+tonemap_white = 3.29
+ssao_enabled = true
+ssao_radius = 2.2
+ssao_intensity = 0.75
+ssao_power = 1.1
+ssao_light_affect = 0.65
+glow_enabled = true
+glow_levels/3 = 1.0
+glow_levels/4 = 1.0
+glow_levels/5 = 1.0
+glow_levels/6 = 1.0
+glow_intensity = 0.32
+glow_strength = 0.85
+glow_bloom = 0.02
+glow_blend_mode = 0
+glow_hdr_threshold = 1.35
+fog_enabled = true
+fog_mode = 1
+fog_light_color = Color(0.46, 0.44, 0.62, 1)
+fog_light_energy = 0.42
+fog_sun_scatter = 0.32
+fog_density = 1.0
+fog_depth_begin = 92.0
+fog_depth_end = 190.0
+fog_depth_curve = 1.4
+fog_aerial_perspective = 0.45
+fog_sky_affect = 0.0
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.011
+volumetric_fog_albedo = Color(0.6, 0.62, 0.66, 1)
+volumetric_fog_emission = Color(0.16, 0.1, 0.22, 1)
+volumetric_fog_emission_energy = 0.35
+volumetric_fog_anisotropy = 0.35
+volumetric_fog_length = 140.0
+volumetric_fog_detail_spread = 2.4
+volumetric_fog_ambient_inject = 0.5
+volumetric_fog_sky_affect = 0.0
+adjustment_enabled = true
+adjustment_brightness = 1.02
+adjustment_contrast = 1.07
+adjustment_saturation = 1.12
+
+[sub_resource type="PlaneMesh" id="floor"]
+size = Vector2(160, 120)
+
+[sub_resource type="StandardMaterial3D" id="floor_mat"]
+albedo_color = Color(0.22, 0.2, 0.18, 1)
+roughness = 1.0
+
+[node name="Showroom" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.81915, 0.3838, -0.42625, 0, 0.74314, 0.66913, 0.57358, -0.54812, 0.60875, 0, 40, 0)
+light_color = Color(1, 0.6, 0.28, 1)
+light_energy = 1.45
+light_specular = 0.5
+light_angular_distance = 2.4
+shadow_enabled = true
+shadow_bias = 0.03
+shadow_normal_bias = 1.0
+shadow_blur = 1.7
+directional_shadow_split_1 = 0.131
+directional_shadow_split_2 = 0.129
+directional_shadow_split_3 = 0.256
+directional_shadow_blend_splits = true
+directional_shadow_fade_start = 0.392
+directional_shadow_max_distance = 140.0
+
+[node name="Fill" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.86603, -0.20337, 0.45677, 0, 0.91355, 0.40674, -0.5, 0.35224, -0.79115, 0, 40, 0)
+light_color = Color(0.45, 0.82, 0.68, 1)
+light_energy = 0.3
+light_specular = 0.15
+shadow_enabled = false
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -30)
+mesh = SubResource("floor")
+material_override = SubResource("floor_mat")
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.95414, 0.29937, 0, -0.29937, 0.95414, 26, 14, 18)
+fov = 60.0
+current = true
+
+[node name="Grave_Broken" type="Node3D" parent="."]
+
+[node name="EA_Grave_Broken_Comp_01" parent="Grave_Broken" instance=ExtResource("1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.31, 0, 0)
+
+[node name="EA_Grave_Broken_Full_01a" parent="Grave_Broken" instance=ExtResource("2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.67, 0, 0)
+
+[node name="EA_Grave_Broken_Full_01b" parent="Grave_Broken" instance=ExtResource("3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.27, 0, 0)
+
+[node name="EA_Grave_Broken_Full_01c" parent="Grave_Broken" instance=ExtResource("4")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.68, 0, 0)
+
+[node name="EA_Grave_Broken_Full_01d" parent="Grave_Broken" instance=ExtResource("5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.645, 0, 0)
+
+[node name="EA_Grave_Broken_Full_01e" parent="Grave_Broken" instance=ExtResource("6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26.45, 0, 0)
+
+[node name="EA_Grave_Broken_Half_01a" parent="Grave_Broken" instance=ExtResource("7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.76, 0, 0)
+
+[node name="EA_Grave_Broken_Half_01b" parent="Grave_Broken" instance=ExtResource("8")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.77, 0, 0)
+
+[node name="EA_Grave_Broken_Half_01c" parent="Grave_Broken" instance=ExtResource("9")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36, 0, 0)
+
+[node name="EA_Grave_Broken_Half_01d" parent="Grave_Broken" instance=ExtResource("10")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39.79, 0, 0)
+
+[node name="Grave_Distinctive_Memorials" type="Node3D" parent="."]
+
+[node name="EA_Grave_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("11")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.815, 0, -9.62)
+
+[node name="EA_Grave_Arch_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("12")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.68, 0, -9.62)
+
+[node name="EA_Grave_Bank_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("13")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.545, 0, -9.62)
+
+[node name="EA_Grave_Book_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("14")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.505, 0, -9.62)
+
+[node name="EA_Grave_Columbarium_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("15")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.63, 0, -9.62)
+
+[node name="EA_Grave_Monu_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("16")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35.025, 0, -9.62)
+
+[node name="EA_Grave_RockStack_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("17")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.265, 0, -9.62)
+
+[node name="EA_Grave_Rock_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("18")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.51, 0, -9.62)
+
+[node name="EA_Grave_Tomb_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("19")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.75, 0, -9.62)
+
+[node name="EA_Grave_WoodForm_01a" parent="Grave_Distinctive_Memorials" instance=ExtResource("20")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55.99, 0, -9.62)
+
+[node name="Grave_Halloween" type="Node3D" parent="."]
+
+[node name="EA_Grave_Archway_Wood_01a" parent="Grave_Halloween" instance=ExtResource("21")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.64, 0, -21.52)
+
+[node name="EA_Grave_Lantern_Stone_01a" parent="Grave_Halloween" instance=ExtResource("22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.89, 0, -21.52)
+
+[node name="EA_Grave_LogPile_01a" parent="Grave_Halloween" instance=ExtResource("23")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.89, 0, -21.52)
+
+[node name="EA_Grave_Mud_Flat_01a" parent="Grave_Halloween" instance=ExtResource("24")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.27, 0, -21.52)
+
+[node name="EA_Grave_Mud_Plank_01a" parent="Grave_Halloween" instance=ExtResource("25")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.63, 0, -21.52)
+
+[node name="EA_Grave_Mud_Post_01a" parent="Grave_Halloween" instance=ExtResource("26")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.99, 0, -21.52)
+
+[node name="EA_Grave_Mud_Stones_01a" parent="Grave_Halloween" instance=ExtResource("27")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27.37, 0, -21.52)
+
+[node name="EA_Grave_Obelisk_01a" parent="Grave_Halloween" instance=ExtResource("28")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30.81, 0, -21.52)
+
+[node name="EA_Grave_Pyramid_01a" parent="Grave_Halloween" instance=ExtResource("29")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34.24, 0, -21.52)
+
+[node name="EA_Grave_Railing_01a" parent="Grave_Halloween" instance=ExtResource("30")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.51, 0, -21.52)
+
+[node name="EA_Grave_Slab_Tall_01a" parent="Grave_Halloween" instance=ExtResource("31")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42.53, 0, -21.52)
+
+[node name="Grave_Modern" type="Node3D" parent="."]
+
+[node name="EA_Grave_Modern_Full_01a" parent="Grave_Modern" instance=ExtResource("32")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.375, 0, -27.8)
+
+[node name="EA_Grave_Modern_Full_01b" parent="Grave_Modern" instance=ExtResource("33")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.93, 0, -27.8)
+
+[node name="EA_Grave_Modern_Full_01c" parent="Grave_Modern" instance=ExtResource("34")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.28, 0, -27.8)
+
+[node name="EA_Grave_Modern_Full_01d" parent="Grave_Modern" instance=ExtResource("35")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.47, 0, -27.8)
+
+[node name="EA_Grave_Modern_Mini_01a" parent="Grave_Modern" instance=ExtResource("36")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.15, 0, -27.8)
+
+[node name="EA_Grave_Modern_Mini_01b" parent="Grave_Modern" instance=ExtResource("37")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.04, 0, -27.8)
+
+[node name="EA_Grave_Modern_Mini_01c" parent="Grave_Modern" instance=ExtResource("38")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.83, 0, -27.8)
+
+[node name="EA_Grave_Modern_Mini_01d" parent="Grave_Modern" instance=ExtResource("39")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.51, 0, -27.8)
+
+[node name="Grave_Sand" type="Node3D" parent="."]
+
+[node name="EA_Grave_Sand_Mini_01a" parent="Grave_Sand" instance=ExtResource("40")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.54, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_01b" parent="Grave_Sand" instance=ExtResource("41")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.33, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_01c" parent="Grave_Sand" instance=ExtResource("42")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.3, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_01d" parent="Grave_Sand" instance=ExtResource("43")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.57, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_01e" parent="Grave_Sand" instance=ExtResource("44")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.87, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_01f" parent="Grave_Sand" instance=ExtResource("45")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.85, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_02a" parent="Grave_Sand" instance=ExtResource("46")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27.62, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_02b" parent="Grave_Sand" instance=ExtResource("47")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.41, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_02c" parent="Grave_Sand" instance=ExtResource("48")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.38, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_02d" parent="Grave_Sand" instance=ExtResource("49")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.45, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_03a" parent="Grave_Sand" instance=ExtResource("50")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.51, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_03b" parent="Grave_Sand" instance=ExtResource("51")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 51.26, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_03c" parent="Grave_Sand" instance=ExtResource("52")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56.01, 0, -35.55)
+
+[node name="EA_Grave_Sand_Mini_03d" parent="Grave_Sand" instance=ExtResource("53")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 59.7, 0, -35.55)
+
+[node name="Grave_Stone" type="Node3D" parent="."]
+
+[node name="EA_Grave_Stone_Mini_01a" parent="Grave_Stone" instance=ExtResource("54")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.485, 0, -43.43)
+
+[node name="EA_Grave_Stone_Mini_01b" parent="Grave_Stone" instance=ExtResource("55")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.125, 0, -43.43)
+
+[node name="EA_Grave_Stone_Mini_01c" parent="Grave_Stone" instance=ExtResource("56")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.675, 0, -43.43)
+
+[node name="EA_Grave_Stone_Mini_01d" parent="Grave_Stone" instance=ExtResource("57")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.23, 0, -43.43)
+
+[node name="EA_Grave_Stone_Mini_01e" parent="Grave_Stone" instance=ExtResource("58")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.77, 0, -43.43)
+
+[node name="EA_Grave_Stone_Mini_02a" parent="Grave_Stone" instance=ExtResource("59")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.19, 0, -43.43)
+
+[node name="EA_Grave_Stone_Mini_02b" parent="Grave_Stone" instance=ExtResource("60")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.675, 0, -43.43)
+
+[node name="EA_Grave_Stone_Mini_02c" parent="Grave_Stone" instance=ExtResource("61")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.275, 0, -43.43)
+
+[node name="EA_Grave_Stone_Mini_02d" parent="Grave_Stone" instance=ExtResource("62")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.89, 0, -43.43)
+
+[node name="Grave_Wooden" type="Node3D" parent="."]
+
+[node name="EA_Grave_Wooden_Mini_01a" parent="Grave_Wooden" instance=ExtResource("63")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -47.55)
+
+[node name="EA_Grave_Wooden_Mini_01b" parent="Grave_Wooden" instance=ExtResource("64")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.27, 0, -47.55)
+
+[node name="EA_Grave_Wooden_Mini_01c" parent="Grave_Wooden" instance=ExtResource("65")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.85, 0, -47.55)
+
+[node name="EA_Grave_Wooden_Mini_01d" parent="Grave_Wooden" instance=ExtResource("66")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.46, 0, -47.55)
+
+[node name="Environment" type="Node3D" parent="."]
+
+[node name="EA_Environment_Nature_Grass_1b" parent="Environment" instance=ExtResource("67")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.58, 0, -51.95)
+
+[node name="EA_Environment_Nature_Grass_1c" parent="Environment" instance=ExtResource("68")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.635, 0, -51.95)
+
+[node name="EA03_Environment_Moss_03" parent="Environment" instance=ExtResource("69")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.345, 0, -51.95)
+
+[node name="EA03_Environment_Mud_05a" parent="Environment" instance=ExtResource("70")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.04, 0, -51.95)
+
+[node name="EA_Environment_Nature_Tree_3b" parent="Environment" instance=ExtResource("71")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.3, 0, -51.95)

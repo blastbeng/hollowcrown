@@ -1,0 +1,21 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://Shaders/EA_TerrainMud.gdshader" id="1_uicui"]
+[ext_resource type="Texture2D" path="res://Textures/EA_Ground_Mud.png" id="2_bo68c"]
+
+[resource]
+resource_name = "EA_Terrain"
+render_priority = 0
+shader = ExtResource("1_uicui")
+shader_parameter/mud_tex = ExtResource("2_bo68c")
+shader_parameter/mud_scale = 2.4
+shader_parameter/macro_scale = 0.31
+shader_parameter/macro_amount = 0.42
+shader_parameter/mud_tint = Vector3(1, 1, 1)
+shader_parameter/wet_tint = Vector3(0.55, 0.52, 0.5)
+shader_parameter/path_tint = Vector3(1.78, 1.66, 1.46)
+shader_parameter/dry_tint = Vector3(1.28, 1.22, 1.1)
+shader_parameter/puddle_tint = Vector3(0.34, 0.36, 0.38)
+shader_parameter/dry_roughness = 0.95
+shader_parameter/wet_roughness = 0.42
+shader_parameter/puddle_roughness = 0.34
