@@ -69,6 +69,17 @@ public partial class CombatAuthority : Node
     /// must carry who is playing). 0 = no central character (offline/test).</summary>
     public static long PendingCharacterId;
 
+    /// <summary>Remote-peer gear gap (Vision 8 NEXT 1): derived gear stats the
+    /// NEXT outbound connection DECLARES at handshake. Session gear lives only
+    /// on the owning client, so the server otherwise capped remote peers at
+    /// the base 100 HP with no haste and no gear ward. Filled by SendHandshake
+    /// from ProgressionSession; 0 = no session (offline/test). Only STATS flow
+    /// — tint/weapon visuals stay local-session by design.</summary>
+    public static int PendingGearVitality;
+    public static int PendingGearPower;
+    public static int PendingGearHaste;
+    public static int PendingGearWard;
+
     /// <summary>Match-server token (Vision 4): set by DedicatedServer at
     /// registration, relayed by the CLIENT on progression saves (the server
     /// token identifies the realm; the user token identifies the player).</summary>
@@ -85,15 +96,6 @@ public partial class CombatAuthority : Node
         int winnerMmr, int loserMmr, int winnerDelta, int loserDelta,
         string winnerTier, string loserTier);
 
-    /// <summary>Loot slice 2 (Vision 8): derived max HP for a peer — base 100
-    /// + vitality affixes on the session's equipped gear (BALANCE.md affix
-    /// table). Only the LOCAL session is known here; remote peers' gear
-    /// lives on their own clients.</summary>
-    public static int MaxHpOf(int peerId) =>
-        peerId == 1 || (peerId >= 500 && peerId < 1000)
-            ? ProgressionSession.DerivedMaxHp
-            : PlayerMaxHp;
-
     private sealed class PeerInfo
     {
         public bool Approved;
@@ -103,6 +105,14 @@ public partial class CombatAuthority : Node
         public Vector3 Position;
         public float Yaw;
         public ICombatTarget? Target;
+        // Remote-peer gear gap (Vision 8 NEXT 1): derived stats declared at
+        // handshake — max HP (vitality), haste floor and the gear-ward pool
+        // now apply to remote peers too. Power is stored for the server-side
+        // damage mirror (damage validation still reads CombatTables only).
+        public int Vitality;
+        public int Power;
+        public int Haste;
+        public int Ward;
     }
 
     /// <summary>Server-side data-only record for a remote player: no visuals,
@@ -118,7 +128,8 @@ public partial class CombatAuthority : Node
         }
         public int CombatId { get; }
         public string DisplayName { get; }
-        public int MaxHp => PlayerMaxHp;
+        // Handshake-declared vitality for real peers; base fallback otherwise.
+        public int MaxHp => _auth.MaxHpOfPeer(CombatId);
         public int Hp => _auth._hp.TryGetValue(CombatId, out int hp) ? hp : MaxHp;
         public bool IsDead => Hp <= 0;
         public Vector3 CombatPosition => _auth._peers.TryGetValue(CombatId, out var info)
@@ -180,6 +191,38 @@ public partial class CombatAuthority : Node
     public bool IsAuthorityMode => !Networked || Multiplayer.IsServer();
 
     private int MyPeerId => Networked ? Multiplayer.GetUniqueId() : 1;
+
+    // ---------- per-peer gear stats (remote-peer gear gap, NEXT 1) ----------
+
+    /// <summary>Server truth: base 100 + handshake-declared vitality for real
+    /// peers; the local session's derived value for peer 1 / harness bots;
+    /// fallback base when the roster does not know the peer.</summary>
+    private int MaxHpOfPeer(int peerId) =>
+        _maxHp.TryGetValue(peerId, out int known)
+            ? known
+            : _peers.TryGetValue(peerId, out var info) && info.Vitality > 0
+                ? PlayerMaxHp + info.Vitality
+                : peerId == 1 || (peerId >= 500 && peerId < 1000)
+                    ? ProgressionSession.DerivedMaxHp
+                    : PlayerMaxHp;
+
+    /// <summary>Server truth: handshake-declared haste affixes for real peers,
+    /// the local session for peer 1 / harness bots, else none.</summary>
+    private int GearHasteOfPeer(int peerId) =>
+        _peers.TryGetValue(peerId, out var info) && info.Approved
+            ? info.Haste
+            : peerId == 1 || (peerId >= 500 && peerId < 1000)
+                ? ProgressionSession.DerivedHaste
+                : 0;
+
+    /// <summary>Server truth: handshake-declared gear ward for remote peers,
+    /// the local session's derived pool for peer 1 / harness bots.</summary>
+    private int GearWardOfPeer(int peerId) =>
+        _peers.TryGetValue(peerId, out var info) && info.Approved
+            ? info.Ward
+            : peerId == 1 || (peerId >= 500 && peerId < 1000)
+                ? ProgressionSession.DerivedWard
+                : 0;
 
     public static CombatAuthority? For(Node node) =>
         node.GetTree().GetFirstNodeInGroup("combat_authority") as CombatAuthority;
@@ -250,13 +293,34 @@ public partial class CombatAuthority : Node
 
     private void SendHandshake()
     {
-        RpcId(1, nameof(HandshakeRpc), PendingPassword, PendingClass, PendingCharacterId);
-        GD.Print($"REALM: handshake sent (character={PendingCharacterId}) — awaiting approval");
+        // Remote-peer gear gap (Vision 8 NEXT 1): the client DECLARES its
+        // derived gear stats with the handshake — session gear lives only on
+        // the owning client, so this is the server's only chance to learn
+        // vitality/haste/ward (and power for the damage mirror). Safe on
+        // every join path (--join, harness, browser): fallback 0 when no
+        // central character was selected.
+        if (!IsAuthorityMode)
+        {
+            PendingGearVitality = ProgressionSession.CharacterId > 0
+                ? ProgressionSession.StatTotal("vitality") : 0;
+            PendingGearPower = ProgressionSession.CharacterId > 0
+                ? ProgressionSession.StatTotal("power") : 0;
+            PendingGearHaste = ProgressionSession.CharacterId > 0
+                ? ProgressionSession.StatTotal("haste") : 0;
+            PendingGearWard = ProgressionSession.CharacterId > 0
+                ? ProgressionSession.StatTotal("ward") : 0;
+        }
+        RpcId(1, nameof(HandshakeRpc), PendingPassword, PendingClass, PendingCharacterId,
+            PendingGearVitality, PendingGearPower, PendingGearHaste, PendingGearWard);
+        GD.Print($"REALM: handshake sent (character={PendingCharacterId} " +
+                 $"gear vit={PendingGearVitality} power={PendingGearPower} " +
+                 $"haste={PendingGearHaste} ward={PendingGearWard}) — awaiting approval");
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = false,
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void HandshakeRpc(string password, string classId, long characterId)
+    private void HandshakeRpc(string password, string classId, long characterId,
+        int vitality, int power, int haste, int ward)
     {
         int peer = Multiplayer.GetRemoteSenderId();
         if (!_peers.TryGetValue(peer, out var info))
@@ -276,6 +340,13 @@ public partial class CombatAuthority : Node
         // race and created the record with the default id).
         info.ClassId = classId;
         info.CharacterId = characterId;
+        // Remote-peer gear gap (Vision 8 NEXT 1): stored per peer so
+        // MaxHpOfPeer/GearHasteOfPeer/GearWardOfPeer serve the server truth
+        // for every combatant, not just the local session.
+        info.Vitality = Mathf.Max(0, vitality);
+        info.Power = Mathf.Max(0, power);
+        info.Haste = Mathf.Max(0, haste);
+        info.Ward = Mathf.Max(0, ward);
 
         if (password != DedicatedServer.RealmPassword)
         {
@@ -292,14 +363,14 @@ public partial class CombatAuthority : Node
         info.Target = record;
         _targets[peer] = record;
         // Loot slice 2 (Vision 8): vitality affixes on EQUIPPED gear raise
-        // max HP — the server computes the derived number from the session
-        // stats (peer identity == the local session on that peer).
-        int maxHp = MaxHpOf(peer);
+        // max HP — server truth from the handshake-declared stats now (the
+        // client mirror takes the SAME number in SpawnPlayerRpc).
+        int maxHp = MaxHpOfPeer(peer);
         _hp[peer] = maxHp;
         _maxHp[peer] = maxHp;
         _respawnPos[peer] = spawn;
         info.Position = spawn;
-        SendSpawnPlayer(peer, spawn, name, info.ClassId);
+        SendSpawnPlayer(peer, spawn, name, info.ClassId, maxHp);
         // Vision 4: hand the approved peer the realm's match-server token —
         // the client relays it (X-Server-Token) on progression saves. Never
         // sent to unapproved peers.
@@ -312,19 +383,21 @@ public partial class CombatAuthority : Node
         {
             if (otherId == peer || !other.Approved)
                 continue;
+            int otherMaxHp = MaxHpOfPeer(otherId);
             RpcId(peer, nameof(SpawnPlayerRpc), otherId,
                 SpawnPoints[other.SpawnIndex],
                 $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(other.ClassId))}#{otherId}",
-                other.ClassId);
+                other.ClassId, otherMaxHp);
         }
     }
 
-    private void SendSpawnPlayer(int peerId, Vector3 spawnPos, string displayName, string classId)
+    private void SendSpawnPlayer(int peerId, Vector3 spawnPos, string displayName,
+        string classId, int maxHp)
     {
         if (Networked)
-            Rpc(nameof(SpawnPlayerRpc), peerId, spawnPos, displayName, classId);
+            Rpc(nameof(SpawnPlayerRpc), peerId, spawnPos, displayName, classId, maxHp);
         else
-            SpawnPlayerRpc(peerId, spawnPos, displayName, classId);
+            SpawnPlayerRpc(peerId, spawnPos, displayName, classId, maxHp);
     }
 
     private void SendDespawnPlayer(int peerId)
@@ -349,7 +422,8 @@ public partial class CombatAuthority : Node
 
     [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void SpawnPlayerRpc(int peerId, Vector3 spawnPos, string displayName, string classId)
+    private void SpawnPlayerRpc(int peerId, Vector3 spawnPos, string displayName,
+        string classId, int maxHp)
     {
         var arena = GetParent().GetNodeOrNull<Node3D>("Arena");
 
@@ -391,11 +465,16 @@ public partial class CombatAuthority : Node
                 Position = spawnPos,
             };
             arena?.AddChild(avatar, forceReadableName: true);
+            // Server-declared max HP (handshake vitality) feeds the avatar's
+            // nameplate bar — after AddChild, the bar nodes exist.
+            avatar.SetMaxHp(maxHp);
             if (_peers.TryGetValue(peerId, out var info))
                 info.Target = avatar;
             _targets[peerId] = avatar;
-            _hp[peerId] = PlayerMaxHp;
-            _maxHp[peerId] = PlayerMaxHp;
+            // Client mirror takes the server's max HP (handshake vitality) —
+            // gear-vitality victims used to mirror base 100 here.
+            _hp[peerId] = maxHp;
+            _maxHp[peerId] = maxHp;
             _respawnPos[peerId] = spawnPos;
             GD.Print($"REALM: {displayName} spawned (avatar) at {spawnPos}");
         }
@@ -511,11 +590,15 @@ public partial class CombatAuthority : Node
             }
         }
         _targets[peerId] = player;
-        _hp[peerId] = PlayerMaxHp;
-        _maxHp[peerId] = PlayerMaxHp;
+        // The local body always mirrors its OWN session (vitality affixes);
+        // remote peers take the handshake-declared number instead (this
+        // registration used to hardcode base 100).
+        int maxHp = ProgressionSession.DerivedMaxHp;
+        _hp[peerId] = maxHp;
+        _maxHp[peerId] = maxHp;
         _respawnPos[peerId] = SpawnPoints[0];
         player.AssignCombatId(peerId);
-        GD.Print($"AUTHORITY: local warden registered id={peerId} max_hp={PlayerMaxHp}");
+        GD.Print($"AUTHORITY: local warden registered id={peerId} max_hp={maxHp}");
     }
 
     public void Unregister(int id)
@@ -665,12 +748,10 @@ public partial class CombatAuthority : Node
         var key = (attackerPeer, attackId);
         // Gear haste (loot slice 3, Vision 8): equipped haste affixes shrink
         // the SERVER-side interval floor for this peer (BALANCE.md) — 0.01 s
-        // per point, capped at half speed. Only the LOCAL session's gear is
-        // known to the server (same limitation as the ward/vitality mirrors).
-        float hasteMult = attackerPeer == MyPeerId || (attackerPeer >= 500 && attackerPeer < 1000)
-            ? 1f - Mathf.Min(CombatTables.HasteCapMultiplier,
-                  (float)(ProgressionSession.DerivedHaste * CombatTables.HastePerPoint))
-            : 1f;
+        // per point, capped at half speed. Remote-peer gear gap (NEXT 1):
+        // the handshake-declared stats serve remote peers too.
+        float hasteMult = 1f - Mathf.Min(CombatTables.HasteCapMultiplier,
+            (float)(GearHasteOfPeer(attackerPeer) * CombatTables.HastePerPoint));
         if (_lastHitAt.TryGetValue(key, out double last) &&
             now - last < atk.MinInterval * hasteMult - 0.05)
         {
@@ -715,6 +796,13 @@ public partial class CombatAuthority : Node
         }
 
         _lastHitAt[key] = now;
+        // Cast relay (remote-avatar polish, NEXT 1): the swing/cast itself is
+        // broadcast so remote puppets replay it. Validation (cooldown/arc/
+        // line) has passed and the attack is REGISTERED here — the relay is
+        // not gated on the damage math below (a fully warded hit still reads
+        // as a cast on screen). The owning client already played its own
+        // swing; CastRpc skips it.
+        SendCast(attackerPeer, attackId, facing);
         // Nightblade stealth (Vision 7): the first attack breaks the state
         // and the server adds the +50% bonus to THAT hit. Sane-capped stack.
         float mult = BuffOf(attackerPeer, now);
@@ -982,7 +1070,7 @@ public partial class CombatAuthority : Node
         // Loot slice 2 (Vision 8): ward affixes on freshly picked-up gear
         // grow the peer's absorb pool (server-owned; stacks with the soul
         // ward — both run through the same _wards dictionary).
-        int gearWard = peer == MyPeerId ? ProgressionSession.DerivedWard : 0;
+        int gearWard = GearWardOfPeer(peer);
         if (gearWard > 0 && !_wards.ContainsKey(peer))
         {
             _wards[peer] = gearWard;
@@ -1069,9 +1157,9 @@ public partial class CombatAuthority : Node
     }
 
     /// <summary>Gear-ward component of a peer's absorb pool (loot slice 2:
-    /// ward affixes); only the local session's gear is known.</summary>
-    private static int peerGearWard(int peer) =>
-        peer == 1 ? ProgressionSession.DerivedWard : 0;
+    /// ward affixes). Remote-peer gear gap (NEXT 1): remote peers contribute
+    /// their handshake-declared ward too, not just the local session.</summary>
+    private int peerGearWard(int peer) => GearWardOfPeer(peer);
 
     private void SendWardState(int peerId, float amount)
     {
@@ -1169,6 +1257,30 @@ public partial class CombatAuthority : Node
             Rpc(nameof(ApplyHitRpc), victimId, amount, heavy, hpAfter, killed);
         else
             ApplyHitRpc(victimId, amount, heavy, hpAfter, killed);
+    }
+
+    private void SendCast(int peerId, int attackId, Vector3 facing)
+    {
+        if (Networked)
+            Rpc(nameof(CastRpc), peerId, attackId, facing);
+        else
+            CastRpc(peerId, attackId, facing);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void CastRpc(int peerId, int attackId, Vector3 facing)
+    {
+        if (!_targets.TryGetValue(peerId, out var target))
+            return;
+        // The owning client already played its own swing locally (the chains
+        // call PlayAttackAnim before requesting) — replaying it would double-
+        // play. Bots animate themselves; RemoteAvatar puppets are the only
+        // bodies that need the relayed cast.
+        if (target is PlayerController pc && pc.PeerId == peerId)
+            return;
+        if (target is RemoteAvatar avatar)
+            avatar.PlayRemoteCast(attackId, facing);
     }
 
     private void SendTargetStunned(int victimId, float seconds)
@@ -1360,7 +1472,9 @@ public partial class CombatAuthority : Node
                 GD.Print($"AUTHORITY: ward expired peer={id}");
                 // Loot slice 2 (Vision 8): the gear ward returns after the
                 // kit ward pool expires (it only replaced it while active).
-                int gearWard = id == MyPeerId ? ProgressionSession.DerivedWard : 0;
+                // Remote-peer gear gap (NEXT 1): remote peers restore their
+                // declared gear pool too.
+                int gearWard = GearWardOfPeer(id);
                 if (gearWard > 0)
                 {
                     _wards[id] = gearWard;

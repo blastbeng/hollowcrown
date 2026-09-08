@@ -56,7 +56,8 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
     // The MATCH SERVER owns this HP number; the local value mirrors what the
     // authority broadcasts and never drives gameplay decisions locally.
     // Loot slice 2 (Vision 8): MaxHp includes EQUIPPED vitality affixes —
-    // the server derives the SAME number via CombatAuthority.MaxHpOf.
+    // the server derives the SAME number from the handshake-declared stats
+    // (CombatAuthority.HandshakeRpc).
     public int MaxHp => ProgressionSession.DerivedMaxHp;   // BALANCE.md: player_hp + vitality
     public int Hp { get; private set; }
     public bool IsDead { get; private set; }
@@ -91,6 +92,7 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
 
     private const float FallDuration = 0.45f;
     private float _stunTimer, _fallTimer, _rootTimer;
+    private MeshInstance3D? _rootDisc;          // authority-root ground circle (NEXT 1)
 
     public void OnHitApplied(int amount, bool heavy, int hpAfter)
     {
@@ -153,6 +155,10 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         Velocity = Vector3.Zero;
         _stunTimer = 0f;
         _fallTimer = FallDuration;
+        // Root disc dies with the body (remote-avatar polish, NEXT 1).
+        _rootTimer = 0f;
+        if (_rootDisc is not null)
+            _rootDisc.Visible = false;
         GD.Print($"WARDEN DOWN ({DisplayName}) — respawn scheduled server-side");
     }
 
@@ -256,7 +262,12 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         if (stunned)
             _stunTimer -= delta;
         if (_rootTimer > 0f)
+        {
             _rootTimer -= delta;
+            SyncRootDisc();   // remote-avatar polish (NEXT 1): local bodies get the disc too
+        }
+        else if (_rootDisc is { } disc && disc.Visible)
+            disc.Visible = false;
 
         UpdateStamina(delta);
         UpdateDodgeTimers(delta);
@@ -293,6 +304,31 @@ public partial class PlayerController : CharacterBody3D, ICombatTarget
         }
 
         MoveAndSlide();
+    }
+
+    /// <summary>Authority-root ground circle (remote-avatar polish, NEXT 1):
+    /// same flat arcane disc the remote puppets draw, on the local body.</summary>
+    private void SyncRootDisc()
+    {
+        if (_rootDisc is null)
+        {
+            _rootDisc = new MeshInstance3D
+            {
+                Name = "RootDisc",
+                Mesh = GroundShapes.Sector(1.1f, 360f, Vector3.Forward),
+                MaterialOverride = new StandardMaterial3D
+                {
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                    AlbedoColor = new Color(0.42f, 0.29f, 0.54f, 0.5f),   // arcane
+                    CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+                },
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            AddChild(_rootDisc);
+        }
+        _rootDisc.Visible = true;
+        _rootDisc.GlobalPosition = new Vector3(GlobalPosition.X, 0.02f, GlobalPosition.Z);
     }
 
     /// <summary>Death presentation: the rigged Death01 clip plays once and the
