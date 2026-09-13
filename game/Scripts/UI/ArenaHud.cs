@@ -64,11 +64,13 @@ public partial class ArenaHud : CanvasLayer
         BuildTargetFrame(root);
         BuildKillFeed(root);
         BuildLevelRow(root);
+        BuildScoreRow(root);
         BuildInventoryButton(root);
         if (CombatAuthority.For(this) is { } auth)
         {
             auth.KillFeed += AddKillFeed;   // server-broadcast killfeed
             auth.LootGranted += OnLootGranted;   // loot slice 2 pickup toast
+            auth.ScoreChanged += OnScoreChanged;   // skirmish team score mirror
         }
         GD.Print($"ARENA HUD READY — {_slots.Count} ability slots, stamina, target frame, killfeed, XP row");
     }
@@ -118,6 +120,50 @@ public partial class ArenaHud : CanvasLayer
     /// <summary>Fired by the Leave Realm button — Main shows the results
     /// screen and saves progression to central (Vision 6.10 flow).</summary>
     [Signal] public delegate void LeaveRealmEventHandler();
+
+    // ---------------- skirmish score row (Vision 1 NEXT) ----------------------
+
+    private Label _scoreText = null!;
+
+    /// <summary>Top-center score panel: TEAM A kills — TEAM B kills (goal).
+    /// Server-broadcast via ScoreRpc on every scoring kill; hidden entirely in
+    /// duel mode so the 1v1 HUD stays clean.</summary>
+    private void BuildScoreRow(Control root)
+    {
+        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        panel.AddThemeStyleboxOverride("panel", SlotBox(UiTheme.Panel, UiTheme.PanelBorder));
+        panel.AnchorLeft = 0.5f; panel.AnchorRight = 0.5f;
+        panel.AnchorTop = 0f; panel.AnchorBottom = 0f;
+        panel.OffsetLeft = -110f; panel.OffsetRight = 110f;
+        panel.OffsetTop = 12f; panel.OffsetBottom = 42f;
+        root.AddChild(panel);
+
+        _scoreText = new Label
+        {
+            Text = "",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _scoreText.AddThemeFontSizeOverride("font_size", 14);
+        panel.AddChild(_scoreText);
+        panel.Visible = false;   // duel mode: no score row
+    }
+
+    /// <summary>ScoreRpc mirror: -1 goal = duel (row stays hidden).</summary>
+    private void OnScoreChanged(int scoreA, int scoreB, int goal, bool matchOver, int winningTeam)
+    {
+        if (goal < 0)
+        {
+            _scoreText.GetParent<Control>().Visible = false;
+            return;
+        }
+        _scoreText.GetParent<Control>().Visible = true;
+        _scoreText.Text = matchOver && winningTeam >= 0
+            ? $"TEAM {(winningTeam == 0 ? "A" : "B")} WINS {scoreA}–{scoreB}"
+            : $"A {scoreA} — {scoreB} B  (first to {goal})";
+        _scoreText.AddThemeColorOverride("font_color",
+            matchOver ? UiTheme.Accent : new Color("d8cfc0"));   // bone parchment
+    }
 
     // ---------------------- Inventory (loot slice 2) -----------------------
 

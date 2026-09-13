@@ -22,6 +22,12 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
     /// variant (twin daggers, staff + hood) so classes read at iso zoom.</summary>
     public string ClassId { get; set; } = "warden";
 
+    /// <summary>Skirmish team (Vision 1 NEXT): 0 = ally (west), 1 = enemy
+    /// (east). Allies keep the cold-steel body tint and a bone-colored
+    /// nameplate; enemies stay blood-red. Duel realms spawn everyone as
+    /// team 1 (enemy) — unchanged behavior.</summary>
+    public int Team { get; set; } = 1;
+
     public int MaxHp => _maxHp;
     public int Hp { get; private set; }
     public bool IsDead { get; private set; }
@@ -63,13 +69,15 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
         _lastPos = Position;
         Hp = MaxHp;
 
+        // Skirmish ally read: cold-steel body (no blood tint) + bone nameplate.
+        bool ally = Team == 0;
         _visual = new Node3D { Name = "Visual" };
         // Rigged enemy model (Vision 6.8): same class pipeline, colder tint so
         // friend vs foe reads at iso zoom. The capsule stand-in is retired.
         _model = new WardenModel
         {
             Name = "Model",
-            EnemyTint = true,
+            EnemyTint = !ally,
             ClassVariant = PlayerClassInfo.FromId(ClassId),
         };
         _visual.AddChild(_model);
@@ -85,7 +93,10 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
             OutlineSize = 10,
             Position = new Vector3(0, 2.35f, 0),
         };
-        _nameplate.Modulate = new Color("c0392b").Lerp(new Color("7a1414"), 0.5f);
+        // Skirmish allies read cold steel: nameplate goes bone-parchment.
+        _nameplate.Modulate = ally
+            ? new Color("d8cfc0")
+            : new Color("c0392b").Lerp(new Color("7a1414"), 0.5f);
         AddChild(_nameplate);
 
         // Nameplate HP bar (NEXT 1): thin slab ABOVE the nameplate, yawed to
@@ -113,7 +124,7 @@ public partial class RemoteAvatar : Node3D, ICombatTarget
             MaterialOverride = new StandardMaterial3D
             {
                 ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                AlbedoColor = new Color("c0392b"),            // blood red (enemy palette)
+                AlbedoColor = ally ? new Color("d8cfc0") : new Color("c0392b"), // ally bone / enemy blood red
             },
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
             Position = new Vector3(0f, 0.005f, 0.005f),

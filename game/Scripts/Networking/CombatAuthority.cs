@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Hollowcrown.Combat;
 using Hollowcrown.Player;
@@ -40,11 +41,33 @@ public partial class CombatAuthority : Node
     private const double BeatInterval = 5.0;         // server log beat
 
     /// <summary>Duel spawn points (Vision 6.6): two opposed sides, clear of
-    /// obelisk/dummy/braziers. Deterministic on every peer.</summary>
+    /// obelisk/dummy/braziers. Deterministic on every peer. Team 0 holds
+    /// SpawnPoints[0..], team 1 holds SpawnPoints[2..] — the skirmish sides
+    /// of the same ring (Vision 6.6 duel arena, two fortified halves).</summary>
     public static readonly Vector3[] SpawnPoints =
-        { new(-5f, 0.2f, 8f), new(5f, 0.2f, -8f) };
+        { new(-5f, 0.2f, 8f), new(5f, 0.2f, -8f),    // duel / team A (west)
+          new(-8f, 0.2f, 4f), new(-7f, 0.2f, 10.5f), // team A west half
+          new(8f, 0.2f, -4f), new(7f, 0.2f, -10.5f) }; // team B east half
+
+    // ---------------- Skirmish mode (Vision 1, NEXT TASKS 1) ---------------
+    // Server-owned mode ("duel" 1v1 / "skirmish" 3v3). The mode is decided by
+    // the realm (DedicatedServer --mode) or HC_MODE; clients learn it through
+    // spawn broadcasts. Teams alternate on approval — no pick screen yet.
+    /// <summary>Skirmish score goal (first team to N kills wins) — BALANCE.md
+    /// skirmish_score_goal.</summary>
+    public const int SkirmishScoreGoal = 10;
+
+    /// <summary>Match mode of THIS realm. Set by the authority from the
+    /// --server --mode flag / HC_MODE; clients mirror it from the spawn
+    /// broadcast. Default duel keeps every existing realm unchanged.</summary>
+    public static string MatchMode = "duel";
 
     [Signal] public delegate void KillFeedEventHandler(string text);
+
+    /// <summary>Skirmish (Vision 1): fired on every AUTHORITY-applied kill
+    /// with the live team score — the HUD score row reads the mirror.</summary>
+    [Signal] public delegate void ScoreChangedEventHandler(int scoreA, int scoreB,
+        int goal, bool matchOver, int winningTeam);
 
     /// <summary>Loot slice 2 (Vision 8): fired when the AUTHORITY grants a
     /// pickup to a peer — the inventory panel refreshes on it.</summary>
@@ -102,6 +125,13 @@ public partial class CombatAuthority : Node
         public int SpawnIndex;
         public string ClassId = "warden";
         public long CharacterId;          // central character (MMR attribution)
+        // Skirmish (Vision 1): 0 = team A (west), 1 = team B (east); duel
+        // realms simply give every peer team 0 until the second peer flips.
+        public int Team;
+        // Skirmish ally tint: remote avatars of the SAME team must NOT read
+        // as blood-red enemies (Vision 6.8 nameplate rule). The avatar picks
+        // cold steel for allies; -1 = unknown (enemy default).
+        public int AvatarTeam = -1;
         public Vector3 Position;
         public float Yaw;
         public ICombatTarget? Target;
@@ -175,6 +205,9 @@ public partial class CombatAuthority : Node
     // the same realm are free warmup, not new rated results). A fresh realm
     // (new authority node) reports again.
     private readonly HashSet<(int Winner, int Loser)> _mmrReported = new();
+    // Skirmish (Vision 1): team score mirror — kills PER TEAM, server-owned.
+    private readonly int[] _teamScore = { 0, 0 };
+    private bool _matchOver;
     private int _nextDropId = 1;
     private int _nextSmokeZone;
     private double _lootScanAccum;
@@ -230,6 +263,16 @@ public partial class CombatAuthority : Node
     public override void _Ready()
     {
         AddToGroup("combat_authority");
+        // Skirmish (Vision 1 NEXT): the realm mode comes from the --server
+        // --mode flag / HC_MODE env (DedicatedServer sets MatchMode before
+        // the arena builds). Clients mirror it from the spawn broadcast.
+        if (IsAuthorityMode)
+        {
+            string envMode = System.Environment.GetEnvironmentVariable("HC_MODE") ?? "";
+            if (envMode.Length > 0)
+                MatchMode = envMode;
+            GD.Print($"REALM MODE: {MatchMode} (goal {SkirmishScoreGoal} team kills)");
+        }
         Multiplayer.PeerConnected += OnPeerConnected;
         Multiplayer.PeerDisconnected += OnPeerDisconnected;
         Multiplayer.ConnectedToServer += SendHandshake;
@@ -250,6 +293,40 @@ public partial class CombatAuthority : Node
         Multiplayer.ServerDisconnected -= OnServerGone;
     }
 
+    // ---------------- skirmish team assignment (Vision 1 NEXT) -------------
+
+    /// <summary>Approved-peer count per team — the alternation base. Duel
+    /// realms (MatchMode == "duel") always alternate the two duel spawns and
+    /// treat every peer as team 1 (everyone is an enemy in 1v1).</summary>
+    private int CountOnTeam(int team) =>
+        _peers.Values.Count(p => p.Approved && p.Team == team);
+
+    /// <summary>Team of the NEXT joining peer: skirmish balances onto the
+    /// smaller side (ties -> team A); duel has no teams (everyone enemy).</summary>
+    private int NextTeam() => MatchMode == "skirmish"
+        ? CountOnTeam(0) <= CountOnTeam(1) ? 0 : 1
+        : 1;
+
+    /// <summary>Spawn index of the NEXT peer: duel alternates the two classic
+    /// points; skirmish cycles the owning team's three-point block.</summary>
+    private int NextSpawnIndex()
+    {
+        if (MatchMode != "skirmish")
+            return _spawnCounter++ % 2;
+        int team = CountOnTeam(0) <= CountOnTeam(1) ? 0 : 1;
+        int slot = _teamCounter[team]++;
+        return team == 0 ? 0 + slot % 3 : 2 + slot % 3;
+    }
+    private readonly int[] _teamCounter = { 0, 0 };
+
+    /// <summary>Team of any combat id (peers from the roster; the local peer
+    /// offline / bots = team 1 like a duel; unknown = -1).</summary>
+    public int TeamOf(int combatId) =>
+        _peers.TryGetValue(combatId, out var info) && info.Approved
+            ? info.Team
+            : combatId >= 1000 ? -1   // world targets: no team, always hittable
+            : 1;
+
     // --------------------------- realm session -----------------------------
 
     private void OnPeerConnected(long id)
@@ -260,7 +337,8 @@ public partial class CombatAuthority : Node
         _peers[peerId] = new PeerInfo
         {
             Approved = false,
-            SpawnIndex = _spawnCounter++ % SpawnPoints.Length,
+            SpawnIndex = NextSpawnIndex(),
+            Team = NextTeam(),
         };
         GD.Print($"REALM: peer {peerId} connected — awaiting handshake");
     }
@@ -328,7 +406,8 @@ public partial class CombatAuthority : Node
             // The client's handshake can beat the server's connect event.
             info = new PeerInfo
             {
-                SpawnIndex = _spawnCounter++ % SpawnPoints.Length,
+                SpawnIndex = NextSpawnIndex(),
+                Team = NextTeam(),
                 ClassId = classId,
             };
             _peers[peer] = info;
@@ -358,6 +437,12 @@ public partial class CombatAuthority : Node
 
         info.Approved = true;
         Vector3 spawn = SpawnPoints[info.SpawnIndex];
+        // Skirmish alternation can shift the team AFTER the connect event
+        // pre-assigned it — the roster's own balance rule wins at approval.
+        info.Team = MatchMode == "skirmish"
+            ? CountOnTeam(0) <= CountOnTeam(1) ? 0 : 1
+            : 1;
+        info.AvatarTeam = info.Team;
         string name = $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(classId))}#{peer}";
         var record = new PeerTargetRecord(this, peer, name);
         info.Target = record;
@@ -370,7 +455,7 @@ public partial class CombatAuthority : Node
         _maxHp[peer] = maxHp;
         _respawnPos[peer] = spawn;
         info.Position = spawn;
-        SendSpawnPlayer(peer, spawn, name, info.ClassId, maxHp);
+        SendSpawnPlayer(peer, spawn, name, info.ClassId, maxHp, info.Team);
         // Vision 4: hand the approved peer the realm's match-server token —
         // the client relays it (X-Server-Token) on progression saves. Never
         // sent to unapproved peers.
@@ -387,17 +472,32 @@ public partial class CombatAuthority : Node
             RpcId(peer, nameof(SpawnPlayerRpc), otherId,
                 SpawnPoints[other.SpawnIndex],
                 $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(other.ClassId))}#{otherId}",
-                other.ClassId, otherMaxHp);
+                other.ClassId, otherMaxHp, other.Team);
         }
+        // The new peer's own team (its approval carried it in the spawn, but
+        // a late joiner's HUD reads the static mirror — send it explicitly).
+        RpcId(peer, nameof(TeamRpc), peer, info.Team);
+        if (MatchMode == "skirmish")
+            SendScore();
+    }
+
+    /// <summary>Skirmish: tells a peer its team. Fired at approval and again
+    /// for LATE peers already in the realm (they missed the broadcast).</summary>
+    private void SendTeam(int peerId, int team)
+    {
+        if (Networked)
+            RpcId(peerId, nameof(TeamRpc), peerId, team);
+        else
+            TeamRpc(peerId, team);
     }
 
     private void SendSpawnPlayer(int peerId, Vector3 spawnPos, string displayName,
-        string classId, int maxHp)
+        string classId, int maxHp, int team = 1)
     {
         if (Networked)
-            Rpc(nameof(SpawnPlayerRpc), peerId, spawnPos, displayName, classId, maxHp);
+            Rpc(nameof(SpawnPlayerRpc), peerId, spawnPos, displayName, classId, maxHp, team);
         else
-            SpawnPlayerRpc(peerId, spawnPos, displayName, classId, maxHp);
+            SpawnPlayerRpc(peerId, spawnPos, displayName, classId, maxHp, team);
     }
 
     private void SendDespawnPlayer(int peerId)
@@ -420,12 +520,32 @@ public partial class CombatAuthority : Node
         GD.Print($"REALM: match-server token received ({(token.Length == 0 ? "none" : token[..8] + "…")})");
     }
 
+    /// <summary>Skirmish: MY team as broadcast by the authority (0 = west/A,
+    /// 1 = east/B; duel realms keep everyone on 1 = everyone enemy). Static
+    /// like PendingClass so the HUD + nameplates can read it cheaply.</summary>
+    public static int MyTeam = 1;
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void TeamRpc(int peerId, int team)
+    {
+        if (peerId == MyPeerId)
+            MyTeam = team;
+        GD.Print($"REALM: team assigned — peer {peerId} on team {(team == 0 ? "A (west)" : "B (east)")}");
+    }
+
     [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
         TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void SpawnPlayerRpc(int peerId, Vector3 spawnPos, string displayName,
-        string classId, int maxHp)
+        string classId, int maxHp, int team)
     {
         var arena = GetParent().GetNodeOrNull<Node3D>("Arena");
+        // Skirmish: every peer mirrors its own team from the broadcast —
+        // RemoteAvatar ally tint + HUD score panel read it.
+        if (peerId == MyPeerId)
+            MyTeam = team;
+        else if (_peers.TryGetValue(peerId, out var info))
+            info.AvatarTeam = team;
 
         if (peerId == MyPeerId)
         {
@@ -463,6 +583,7 @@ public partial class CombatAuthority : Node
                 DisplayName = displayName,
                 ClassId = classId,
                 Position = spawnPos,
+                Team = team,
             };
             arena?.AddChild(avatar, forceReadableName: true);
             // Server-declared max HP (handshake vitality) feeds the avatar's
@@ -573,6 +694,9 @@ public partial class CombatAuthority : Node
         _hp[bot.CombatId] = bot.MaxHp;
         _maxHp[bot.CombatId] = bot.MaxHp;
         _respawnPos[bot.CombatId] = bot.CombatPosition;
+        // Skirmish bots (Vision 1 NEXT): joining bots land on a team by the
+        // same alternation rule at spawn approval (the roster holds it);
+        // offline harness bots stay team 1 (everything hittable).
         GD.Print($"AUTHORITY: bot \"{bot.DisplayName}\" registered id={bot.CombatId} max_hp={bot.MaxHp}");
     }
 
@@ -596,7 +720,11 @@ public partial class CombatAuthority : Node
         int maxHp = ProgressionSession.DerivedMaxHp;
         _hp[peerId] = maxHp;
         _maxHp[peerId] = maxHp;
+        // Skirmish offline (HC_MODE=skirmish solo runs): the local peer IS
+        // team A on the west spawn; duel/offline keeps the classic point.
         _respawnPos[peerId] = SpawnPoints[0];
+        if (MatchMode == "skirmish")
+            MyTeam = 0;
         player.AssignCombatId(peerId);
         GD.Print($"AUTHORITY: local warden registered id={peerId} max_hp={maxHp}");
     }
@@ -720,6 +848,15 @@ public partial class CombatAuthority : Node
         if (!_targets.TryGetValue(victimId, out var victim))
         {
             Reject($"hit victim={victimId} peer={attackerPeer}: unknown target");
+            return;
+        }
+        // Skirmish (Vision 1): teams are friendly — hits on same-team
+        // combatants are rejected server-side before any validation math.
+        // World targets (id >= 1000, team -1) stay hittable from anyone.
+        if (MatchMode == "skirmish" && TeamOf(attackerPeer) >= 0 &&
+            TeamOf(attackerPeer) == TeamOf(victimId))
+        {
+            Reject($"hit victim={victimId} peer={attackerPeer}: friendly fire (team {TeamOf(attackerPeer)})");
             return;
         }
         if (!_hp.TryGetValue(victimId, out int hp) || hp <= 0)
@@ -873,7 +1010,28 @@ public partial class CombatAuthority : Node
             // the old victimId < 1000 check silently skipped every real PvP
             // kill — found live).
             if (_peers.ContainsKey(victimId))
+            {
                 ReportMmr(attackerPeer, victimId, victim);
+                // Skirmish scoring (Vision 1): team kills count toward the
+                // goal; duel MMR stays per-character (untouched). The match
+                // ends at the goal — further kills are warmup until Leave.
+                if (MatchMode == "skirmish" && !_matchOver)
+                {
+                    int scorer = TeamOf(attackerPeer);
+                    if (scorer >= 0)
+                    {
+                        _teamScore[scorer]++;
+                        _matchOver = _teamScore[scorer] >= SkirmishScoreGoal;
+                        SendScore();
+                        GD.Print($"AUTHORITY: SCORE team {(scorer == 0 ? "A" : "B")} " +
+                                 $"{_teamScore[0]}-{_teamScore[1]} (goal {SkirmishScoreGoal})" +
+                                 (_matchOver ? $" — MATCH OVER, team {(scorer == 0 ? "A" : "B")} wins" : ""));
+                        SendKillFeed(_matchOver
+                            ? $"TEAM {(scorer == 0 ? "A" : "B")} WINS {_teamScore[0]}-{_teamScore[1]} — leave realm for results"
+                            : $"TEAM {(scorer == 0 ? "A" : "B")} SCORES ({_teamScore[0]}-{_teamScore[1]})");
+                    }
+                }
+            }
             GD.Print($"AUTHORITY: KILL attacker={PeerName(attackerPeer)} " +
                      $"victim={victim.DisplayName}");
         }
@@ -913,6 +1071,29 @@ public partial class CombatAuthority : Node
     {
         if (_targets.TryGetValue(peerId, out var target))
             target.OnProgress(kills, xp);
+    }
+
+    // ---------------------------- skirmish score (Vision 1 NEXT) ------------
+
+    /// <summary>Skirmish: broadcast the live team score to every peer
+    /// (offline runs invoke the body directly, like every other sender).</summary>
+    private void SendScore()
+    {
+        if (Networked)
+            Rpc(nameof(ScoreRpc), _teamScore[0], _teamScore[1], SkirmishScoreGoal, _matchOver);
+        else
+            ScoreRpc(_teamScore[0], _teamScore[1], SkirmishScoreGoal, _matchOver);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true,
+        TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void ScoreRpc(int scoreA, int scoreB, int goal, bool matchOver)
+    {
+        _teamScore[0] = scoreA;
+        _teamScore[1] = scoreB;
+        _matchOver = matchOver;
+        EmitSignal(SignalName.ScoreChanged, scoreA, scoreB, goal, matchOver,
+            scoreA >= goal ? 0 : scoreB >= goal ? 1 : -1);
     }
 
     // ------------------------------ ranking (Vision 8) -----------------------
