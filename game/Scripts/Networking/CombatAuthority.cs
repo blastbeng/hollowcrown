@@ -319,6 +319,18 @@ public partial class CombatAuthority : Node
         int slot = _teamCounter[team]++;
         return (team == 0 ? TeamASpawnIndices : TeamBSpawnIndices)[slot % 3];
     }
+    /// <summary>Team-matching spawn for a joiner whose FINAL team flipped at
+    /// approval (team B joiner must not keep the team A west point the
+    /// connect event picked). Cycles the team's own block.</summary>
+    private int NextSpawnIndexOfTeam(int team)
+    {
+        if (MatchMode != "skirmish")
+            return _spawnCounter++ % 2;
+        int slot = _teamCounter[team]++;
+        return (team == 0 ? TeamASpawnIndices : TeamBSpawnIndices)[slot % 3];
+    }
+    private static int FirstSpawnIndexOfTeam(int team) =>
+        (team == 0 ? TeamASpawnIndices : TeamBSpawnIndices)[0];
     private static readonly int[] TeamASpawnIndices = { 0, 2, 3 };   // west half
     private static readonly int[] TeamBSpawnIndices = { 1, 4, 5 };   // east half
     private readonly int[] _teamCounter = { 0, 0 };
@@ -443,9 +455,22 @@ public partial class CombatAuthority : Node
         Vector3 spawn = SpawnPoints[info.SpawnIndex];
         // Skirmish alternation can shift the team AFTER the connect event
         // pre-assigned it — the roster's own balance rule wins at approval.
-        info.Team = MatchMode == "skirmish"
+        // The joiner's own pre-assigned row must NOT be counted (it is
+        // approved by now): found live — a 3-3 tie counted the joiner's own
+        // team-0 row, flipping every joiner to team B while keeping team A's
+        // west spawn point (team/spawn mismatch).
+        _peers.Remove(peer);
+        int joinTeam = MatchMode == "skirmish"
             ? CountOnTeam(0) <= CountOnTeam(1) ? 0 : 1
             : 1;
+        _peers[peer] = info;
+        info.Team = joinTeam;
+        // The spawn point must match the FINAL team (the connect event picked
+        // it for the pre-assigned team) — a team-B peer spawning on team A's
+        // west point reads as an enemy standing on the wrong side.
+        if (MatchMode == "skirmish" && SpawnPoints[info.SpawnIndex] != SpawnPoints[FirstSpawnIndexOfTeam(joinTeam)])
+            info.SpawnIndex = NextSpawnIndexOfTeam(joinTeam);
+        spawn = SpawnPoints[info.SpawnIndex];
         info.AvatarTeam = info.Team;
         string name = $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(classId))}#{peer}";
         var record = new PeerTargetRecord(this, peer, name);
@@ -636,8 +661,11 @@ public partial class CombatAuthority : Node
         info.Position = pos;
         info.Yaw = yaw;
         // Relay to every OTHER peer (mirrors need it; the sender does not).
+        // Server bots (ids 500-999) are roster rows but NOT ENet peers:
+        // RpcId on them has no receiver and spams "unknown peer ID" errors
+        // (found live on the skirmish 3v3 bot server) — skip them.
         foreach (int other in _peers.Keys)
-            if (other != peer)
+            if (other != peer && (other < 500 || other >= 1000))
                 RpcId(other, nameof(PeerPositionRpc), peer, pos, yaw);
     }
 
