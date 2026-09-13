@@ -189,6 +189,11 @@ compile check (remote or local):
 
 ## 7. NEXT TASKS (top = next; rewrite this list as you work)
 1. Skirmish mode (3v3) + team spawns/score.
+   INTERRUPTED (2026-09-05): verified so far — HUD score row visible after
+   client join; --mode propagation fix committed (dd2211b); --bot dedicated
+   server fix + joiner team balance committed (63d5e01, b48534f). Remains:
+   bot registration on dedicated server, PvP kill -> team score evidence,
+   FF-reject log evidence, team spawn side check.
 3. Open world zone: village chunks, shrines, roaming elites, minimap.
 4. Matchmaking quick-play flow via central.
 5. Atmosphere pass 2: ambience audio, fog drift, fireflies.
