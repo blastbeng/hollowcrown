@@ -84,6 +84,7 @@ public partial class DedicatedServer : Node
                     break;
                 case "--mode" when i + 1 < args.Length:
                     _mode = args[i + 1];
+                    CombatAuthority.MatchMode = _mode;   // skirmish/duel teams + scoring read this (Vision 1 NEXT)
                     i++;
                     break;
                 case "--central" when i + 1 < args.Length:
