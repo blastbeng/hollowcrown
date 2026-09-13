@@ -308,15 +308,19 @@ public partial class CombatAuthority : Node
         : 1;
 
     /// <summary>Spawn index of the NEXT peer: duel alternates the two classic
-    /// points; skirmish cycles the owning team's three-point block.</summary>
+    /// points; skirmish cycles the owning team's three-point block (team A
+    /// west = {0,2,3}, team B east = {1,4,5} — the array order interleaves
+    /// the halves, so the blocks are NOT contiguous indices).</summary>
     private int NextSpawnIndex()
     {
         if (MatchMode != "skirmish")
             return _spawnCounter++ % 2;
         int team = CountOnTeam(0) <= CountOnTeam(1) ? 0 : 1;
         int slot = _teamCounter[team]++;
-        return team == 0 ? 0 + slot % 3 : 2 + slot % 3;
+        return (team == 0 ? TeamASpawnIndices : TeamBSpawnIndices)[slot % 3];
     }
+    private static readonly int[] TeamASpawnIndices = { 0, 2, 3 };   // west half
+    private static readonly int[] TeamBSpawnIndices = { 1, 4, 5 };   // east half
     private readonly int[] _teamCounter = { 0, 0 };
 
     /// <summary>Team of any combat id (peers from the roster; the local peer
@@ -671,6 +675,56 @@ public partial class CombatAuthority : Node
     public void RegisterSelf(PlayerController player)
     {
         RegisterPlayer(player, MyPeerId);
+    }
+
+    /// <summary>Skirmish dedicated server (Vision 1 NEXT): register a
+    /// server-hosted bot as a full PvP combatant with its OWN roster row —
+    /// team-balanced, friendly-fire-checked, scoring PvP kills, visible to
+    /// already-connected clients (spawn broadcast) and targetable by other
+    /// bots. Bots are NOT ENet peers: they keep their harness id (500-999),
+    /// which ValidateAndApply already trusts as a local attacker id, so no
+    /// real peer id can ever collide with a bot row.</summary>
+    public void RegisterServerBot(CombatBot bot)
+    {
+        if (!IsAuthorityMode || bot.CombatId <= 0)
+            return;   // not the authority host / not armed yet
+        if (_peers.TryGetValue(bot.CombatId, out var existing) && existing.Approved)
+            return;   // already a full server combatant (idempotent)
+
+        // Bot _Ready's bare RegisterBot ran first on the host — it
+        // registered the TARGET without a roster row; fill the row now.
+        if (!_targets.ContainsKey(bot.CombatId))
+        {
+            _targets[bot.CombatId] = bot;
+            _hp[bot.CombatId] = bot.MaxHp;
+            _maxHp[bot.CombatId] = bot.MaxHp;
+        }
+
+        // Roster row: approved, class from the bot, team + spawn point by
+        // the SAME alternation as joining peers (skirmish balances onto the
+        // smaller side; duel keeps everyone team 1). CharacterId stays 0 —
+        // ReportMmr skips ids without a central character (bots never rated).
+        int team = NextTeam();
+        int spawnIndex = NextSpawnIndex();
+        Vector3 spawnPos = SpawnPoints[spawnIndex % SpawnPoints.Length];
+        _peers[bot.CombatId] = new PeerInfo
+        {
+            Approved = true,
+            Team = team,
+            SpawnIndex = spawnIndex,
+            ClassId = bot.ClassId,
+        };
+        bot.GlobalPosition = spawnPos;
+        _respawnPos[bot.CombatId] = spawnPos;
+
+        // Everyone already connected sees the bot like a joining peer
+        // (RemoteAvatar with team tint + nameplate); clients joining later
+        // get it via the catch-up loop in the handshake approval path. No
+        // SendTeam here — bots are NOT ENet peers, RpcId(500+) has no
+        // receiver; the server reads their team from the roster row.
+        SendSpawnPlayer(bot.CombatId, spawnPos, bot.DisplayName, bot.ClassId, bot.MaxHp, team);
+        GD.Print($"AUTHORITY: bot \"{bot.DisplayName}\" registered id={bot.CombatId} " +
+                 $"max_hp={bot.MaxHp} team={(team == 0 ? "A (west)" : "B (east)")} pos={spawnPos}");
     }
 
     /// <summary>Balance-harness bots (Vision 7): same registration path as

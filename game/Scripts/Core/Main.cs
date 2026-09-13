@@ -43,17 +43,11 @@ public partial class Main : Node3D
         string botClasses = "warden";
         float quitAfter = -1f;
 
+        bool serverMode = false;
         foreach (var arg in OS.GetCmdlineUserArgs())
         {
             if (arg == "--server")
-            {
-                AddChild(new DedicatedServer { Name = "DedicatedServer" },
-                    forceReadableName: true);
-                AddCombatAuthority();
-                AddChild(new ArenaTest { Name = "Arena" }, forceReadableName: true);
-                GD.Print("HOLLOWCROWN BOOT OK — dedicated server mode, arena hosted");
-                return;
-            }
+                serverMode = true;
             if (arg == "--bot")
                 botMode = true;
         }
@@ -153,6 +147,24 @@ public partial class Main : Node3D
             {
                 GD.PrintErr($"HC_GEAR SESSION FAILED: {e.Message}");
             }
+        }
+
+        // Dedicated server mode (Vision 1): boot AFTER the full parse so
+        // --mode/--bot/--bot-classes are all known — bots arm on the server
+        // host only when --bot was passed alongside --server (skirmish 3v3
+        // dedicated realms; the flag was silently ignored before: the old
+        // early-return skipped the botMode branch below).
+        if (serverMode)
+        {
+            AddChild(new DedicatedServer { Name = "DedicatedServer" },
+                forceReadableName: true);
+            AddCombatAuthority();
+            AddChild(new ArenaTest { Name = "Arena" }, forceReadableName: true);
+            if (botMode)
+                BootServerBots(botClasses);
+            GD.Print("HOLLOWCROWN BOOT OK — dedicated server mode, arena hosted" +
+                (botMode ? $", {botClasses} bots armed" : ""));
+            return;
         }
 
         if (botMode)
@@ -349,6 +361,48 @@ public partial class Main : Node3D
         if (bot.CombatId < 0)
             bot.AssignCombatId(_nextTestBotId++);
         GD.Print($"BOT HARNESS READY — test bot armed ({classId}) at {pos}");
+    }
+
+    /// <summary>Skirmish dedicated-server bots (Vision 1 NEXT): arm the
+    /// --bot list on the SERVER HOST itself — same alternation/spawn/team
+    /// logic as the balance harness, but registered as full PvP combatants
+    /// via CombatAuthority.RegisterServerBot (roster row + spawn broadcast,
+    /// so clients see avatars with team tint and enemy bots score team
+    /// kills). Runs after DedicatedServer._Ready (ENet host is up, ids are
+    /// stable), one bot per --bot-classes entry ("+"-separated, same
+    /// spelling as the harness: warden/nightblade/revenant).</summary>
+    private void BootServerBots(string botClasses)
+    {
+        var authority = GetNodeOrNull<Hollowcrown.Networking.CombatAuthority>("CombatAuthority");
+        if (authority is null)
+        {
+            GD.PrintErr("SERVER BOTS: no CombatAuthority — bots not armed");
+            return;
+        }
+        string[] classes = botClasses.Length > 0
+            ? botClasses.Split('+')
+            : System.Array.Empty<string>();
+        string[] valid = { "warden", "nightblade", "revenant" };
+        for (int i = 0; i < classes.Length; i++)
+        {
+            string classId = classes[i].Trim();
+            if (System.Array.IndexOf(valid, classId) < 0)
+                classId = valid[i % valid.Length];
+            var bot = new CombatBot
+            {
+                Name = $"Bot{i}",
+                ClassId = classId,
+                BotName = $"{PlayerClassInfo.Label(PlayerClassInfo.FromId(classId))}Bot{i}",
+            };
+            AddChild(bot, forceReadableName: true);
+            if (bot.CombatId < 0)
+                bot.AssignCombatId(500 + i);
+            // Full PvP registration: team-balanced roster row + spawn point
+            // (bot _Ready already did the bare target registration).
+            authority.RegisterServerBot(bot);
+        }
+        GD.Print($"SERVER BOTS READY — {classes.Length} bots armed ({botClasses}) " +
+                 "on the dedicated server host");
     }
 
     private int _nextTestBotId = 500;

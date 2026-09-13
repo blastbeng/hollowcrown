@@ -124,6 +124,11 @@ public partial class CombatBot : CharacterBody3D, ICombatTarget
         // Target selection (harness determinism): another BOT if one is
         // alive (bot-vs-bot matrix runs), else the nearest player body.
         // Training dummies are never targets — they would pollute the matrix.
+        // Skirmish dedicated-server bots have TEAMS — a server bot never
+        // targets (and can never be targeted by) its own team: the friendly-
+        // fire reject would eat every hit, so skip same-team candidates here.
+        bool skirmishTeams = CombatAuthority.MatchMode == "skirmish";
+        int myTeam = skirmishTeams ? authority.TeamOf(CombatId) : -1;
         CombatBot? otherBot = null;
         float bestBot = float.MaxValue;
         ICombatTarget? player = null;
@@ -134,6 +139,9 @@ public partial class CombatBot : CharacterBody3D, ICombatTarget
                 continue;
             if (t.IsDead || t.CombatId <= 0)
                 continue;
+            if (skirmishTeams && t.CombatId != CombatId &&
+                authority.TeamOf(t.CombatId) == myTeam)
+                continue;   // same team: never a target
             var to = n.GlobalPosition - GlobalPosition;
             to.Y = 0f;
             float d = to.Length();
